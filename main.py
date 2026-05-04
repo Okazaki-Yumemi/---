@@ -1,5 +1,6 @@
 import math
 import os
+import random
 import sys
 from copy import deepcopy
 
@@ -245,6 +246,118 @@ LEVELS = [
     },
 ]
 
+SCREEN_TITLE = "TITLE"
+SCREEN_MAIN_MENU = "MAIN_MENU"
+SCREEN_TUTORIAL = "TUTORIAL"
+SCREEN_SCENARIO_SELECT = "SCENARIO_SELECT"
+SCREEN_GAME = "GAME"
+SCREEN_RESULT = "RESULT"
+SCREEN_ENCYCLOPEDIA = "ENCYCLOPEDIA"
+SCREEN_FINAL_SUMMARY = "FINAL_SUMMARY"
+
+SCENARIO_META = [
+    {
+        "subtitle": "富足中的分配",
+        "knowledge": "葡萄糖可进入糖酵解、糖原合成或 PPP。",
+        "idea": "富足时关键不是消耗一切，而是分流与储备。",
+        "stars": 2,
+        "cards": [0, 1, 6],
+        "summary": "你在饭后状态下需要把过剩葡萄糖分配到供能、储备和还原力网络，体现代谢调控中的“富足分流”思想。",
+    },
+    {
+        "subtitle": "快速供能与乳酸代价",
+        "knowledge": "缺氧时呼吸链受限，糖酵解成为短期供能主线。",
+        "idea": "抓住关键路径，同时承认代价。",
+        "stars": 3,
+        "cards": [1, 2, 3, 4],
+        "summary": "短跑缺氧的核心不是盲目强化呼吸链，而是在 ATP 急需与 ROS 风险之间做短期取舍。",
+    },
+    {
+        "subtitle": "逆势而行的糖异生",
+        "knowledge": "饥饿时脂肪供能、糖异生和尿素循环需要协同。",
+        "idea": "逆势而行必须付出能量成本。",
+        "stars": 4,
+        "cards": [5, 6, 9],
+        "summary": "长期饥饿要求你动员脂肪并维持血糖，同时处理氨毒性，体现“逆势而行、协同调控”。",
+    },
+    {
+        "subtitle": "产能与伤害同源",
+        "knowledge": "氧化磷酸化能高效产能，也可能增加 ROS。",
+        "idea": "效率越高，越需要配套防护。",
+        "stars": 4,
+        "cards": [6, 7, 8],
+        "summary": "氧化应激关卡强调 NADPH 与抗氧化修复：产能系统和损伤压力往往来自同一套电子流。",
+    },
+    {
+        "subtitle": "个性归氮，共性归碳",
+        "knowledge": "氨基酸脱氨后，碳骨架可进入能量网络，氮必须安全排出。",
+        "idea": "碳可再利用，氮要被清除。",
+        "stars": 3,
+        "cards": [5, 8, 9],
+        "summary": "高蛋白饮食中，氨基酸碳骨架可供能，但 NH3 需要尿素循环付出 ATP 代价来清除。",
+    },
+]
+
+EVENT_POOLS = [
+    [
+        {"name": "胰岛素信号增强", "effect": {"Glucose": -5, "Glycogen": 8}, "text": "胰岛素信号增强：葡萄糖更倾向进入储备。"},
+        {"name": "血糖继续升高", "effect": {"Glucose": 12}, "text": "血糖继续升高：富足环境仍在扰动稳态。"},
+    ],
+    [
+        {"name": "氧气不足", "effect": {"ROS": 8}, "text": "氧气不足：电子传递受限，ROS 压力上升。"},
+        {"name": "肌肉急需 ATP", "effect": {"ATP": -12}, "text": "肌肉急需 ATP：能量账本被快速拉低。"},
+    ],
+    [
+        {"name": "糖原耗尽", "effect": {"Glycogen": -10}, "text": "糖原耗尽：短期储备接近枯竭。"},
+        {"name": "脂肪动员增强", "effect": {"Fat": -8, "NADH": 8}, "text": "脂肪动员增强：长期能源开始接管供能。"},
+    ],
+    [
+        {"name": "ROS 突增", "effect": {"ROS": 18, "CellHealth": -5}, "text": "ROS 突增：氧化压力直接损伤细胞健康。"},
+        {"name": "抗氧化需求上升", "effect": {"NADPH": -8, "ROS": -8}, "text": "抗氧化需求上升：NADPH 被用于降低氧化压力。"},
+    ],
+    [
+        {"name": "氨基酸摄入增加", "effect": {"AminoAcidPool": 15, "NH3": 8}, "text": "氨基酸摄入增加：碳骨架增加，氮毒性也上升。"},
+        {"name": "尿素循环负荷上升", "effect": {"ATP": -5, "NH3": -10}, "text": "肝脏尿素循环负荷上升：消耗 ATP 换取安全。"},
+    ],
+]
+
+HORMONE_MODES = {
+    "Normal": {"label": "Normal", "desc": "基础稳态模式：不改变卡牌效果。", "multipliers": {}},
+    "Insulin": {
+        "label": "Insulin 胰岛素",
+        "desc": "促进葡萄糖利用和糖原合成，抑制糖异生。",
+        "multipliers": {"glycogenesis": 1.25, "glycolysis": 1.12, "gluconeogenesis": 0.75},
+    },
+    "Glucagon": {
+        "label": "Glucagon 胰高血糖素",
+        "desc": "增强糖原分解和糖异生，削弱糖原合成。",
+        "multipliers": {"glycogenolysis": 1.25, "gluconeogenesis": 1.2, "glycogenesis": 0.75},
+    },
+    "Adrenaline": {
+        "label": "Adrenaline 肾上腺素",
+        "desc": "增强快速供能，ROS 增长略快。",
+        "multipliers": {"glycolysis": 1.18, "glycogenolysis": 1.18, "etc_ros": 1.15, "beta_oxidation_ros": 1.15},
+    },
+    "AMPK": {
+        "label": "AMPK 应激",
+        "desc": "增强分解代谢，削弱合成代谢，ATP 低时保护 CellHealth。",
+        "multipliers": {"lipolysis": 1.15, "beta_oxidation": 1.12, "glycogenesis": 0.72, "ppp": 0.88},
+    },
+}
+
+ENCYCLOPEDIA = [
+    {"name": "G-6-P", "title": "糖代谢分流节点", "explain": "葡萄糖进入细胞后常被转化为 G-6-P，再进入糖酵解、PPP 或糖原代谢。", "role": "游戏中连接 Glucose、Glycolysis、PPP 与 Glycogen。", "idea": "同一底物，因需求不同而分流。", "level": 0},
+    {"name": "PFK-1", "title": "糖酵解关键阀门", "explain": "PFK-1 是糖酵解的重要限速酶，受到能量状态调控。", "role": "对应糖酵解卡牌的关键控制思想。", "idea": "抓住关键，胜过平均用力。", "level": 0},
+    {"name": "乳酸", "title": "缺氧下 NAD+ 再生的代价", "explain": "缺氧时丙酮酸可转为乳酸，以帮助再生 NAD+ 维持糖酵解。", "role": "短跑缺氧中提示少依赖呼吸链。", "idea": "短期续航往往伴随代价。", "level": 1},
+    {"name": "NADH", "title": "呼吸链燃料", "explain": "NADH 携带高能电子，可被呼吸链利用产生 ATP。", "role": "TCA、β-氧化和呼吸链之间的桥梁。", "idea": "能量可以先被藏入势能。", "level": 1},
+    {"name": "β-氧化", "title": "脂肪酸供能通路", "explain": "脂肪酸逐步分解产生乙酰辅酶A和还原当量。", "role": "长期饥饿中维持 ATP 的重要通路。", "idea": "长期能源要在合适情境下动员。", "level": 2},
+    {"name": "糖异生", "title": "耗能维持血糖", "explain": "糖异生消耗 ATP，把非糖物质转化为葡萄糖。", "role": "低糖情境下维持 Glucose，但会带来 NH3 压力。", "idea": "逆势而行必须付出成本。", "level": 2},
+    {"name": "NADPH", "title": "抗氧化与合成代谢还原力", "explain": "NADPH 支持脂质合成和谷胱甘肽抗氧化系统。", "role": "PPP 与抗氧化修复的核心资源。", "idea": "不直接产 ATP 的路径也可能更关键。", "level": 3},
+    {"name": "ROS", "title": "产能系统的副产物", "explain": "电子传递过程可能产生 ROS，过量会损伤细胞。", "role": "限制呼吸链和 β-氧化滥用。", "idea": "效率与风险常常同源。", "level": 3},
+    {"name": "尿素循环", "title": "清除氨毒性", "explain": "尿素循环消耗 ATP，把有毒的氨转化为尿素排出。", "role": "高蛋白饮食和饥饿中保护 CellHealth。", "idea": "牺牲能量以维持安全。", "level": 4},
+    {"name": "氨基酸碳骨架", "title": "回归糖脂能量网络", "explain": "氨基酸脱氨后，碳骨架可进入 TCA 或糖异生。", "role": "连接蛋白质分解、糖异生和 TCA。", "idea": "个性归氮，共性归碳。", "level": 4},
+]
+
 MAP_NODES = {
     "Glucose": (345, 245),
     "G-6-P": (430, 245),
@@ -432,6 +545,14 @@ class Game:
         self.font_lg = load_font(28, bold=True)
         self.font_title = load_font(38, bold=True)
         self.level_index = 0
+        self.screen_state = SCREEN_TITLE
+        self.tutorial_page = 0
+        self.completed_levels = set()
+        self.encyclopedia_return = SCREEN_TITLE
+        self.result_from_level = 0
+        self.hormone_mode = "Normal"
+        self.hormone_switch_turn = -3
+        self.event_popup = None
         self.card_scroll = 0
         self.mode = "playing"
         self.time = 0.0
@@ -457,15 +578,34 @@ class Game:
         self.display_state = {key: float(value) for key, value in self.state.items()}
         self.turn = 0
         self.selected = []
+        self.card_scroll = 0
         self.active_nodes = []
         self.active_edges = []
         self.path_timer = 0.0
         self.pending_result = False
         self.input_locked = False
         self.input_lock_timer = 0.0
+        self.hormone_mode = "Normal"
+        self.hormone_switch_turn = -3
+        self.event_popup = None
         self.log_items = []
         self.add_log(f"进入「{LEVELS[self.level_index]['name']}」。选择 2 张行动卡，调度代谢通量。")
         self.mode = "playing"
+
+    def start_level(self, index):
+        self.level_index = index
+        self.reset_level()
+        self.screen_state = SCREEN_GAME
+
+    def can_switch_hormone(self):
+        return self.turn - self.hormone_switch_turn >= 3 and not self.input_locked
+
+    def set_hormone_mode(self, mode):
+        if mode == self.hormone_mode or not self.can_switch_hormone():
+            return
+        self.hormone_mode = mode
+        self.hormone_switch_turn = self.turn
+        self.add_log(f"全局调控切换为 {HORMONE_MODES[mode]['label']}：{HORMONE_MODES[mode]['desc']}")
 
     def add_log(self, text):
         self.log_items.insert(0, {"text": text, "age": 0.0, "y": -18.0, "alpha": 0.0})
@@ -478,6 +618,15 @@ class Game:
             for key, multiplier in modifier.get("multiplier", {}).items():
                 if key in effect:
                     effect[key] = int(round(effect[key] * multiplier))
+        mode = HORMONE_MODES[self.hormone_mode]
+        multiplier = mode["multipliers"].get(card["id"], 1.0)
+        if multiplier != 1.0:
+            for key in list(effect.keys()):
+                effect[key] = int(round(effect[key] * multiplier))
+        if self.hormone_mode == "Adrenaline":
+            ros_key = f"{card['id']}_ros"
+            if "ROS" in effect and ros_key in mode["multipliers"]:
+                effect["ROS"] = int(round(effect["ROS"] * mode["multipliers"][ros_key]))
         return effect
 
     def apply_homeostatic_pressure(self):
@@ -496,11 +645,21 @@ class Game:
             s["ROS"] += 4
         if s["NADPH"] < 15 and s["ROS"] > 45:
             s["CellHealth"] -= 2
+        if self.hormone_mode == "AMPK" and s["ATP"] < 35:
+            s["CellHealth"] += 2
         for key in STATE_KEYS:
             s[key] = clamp(s[key])
 
+    def apply_event(self):
+        event = random.choice(EVENT_POOLS[self.level_index])
+        for key, delta in event["effect"].items():
+            self.state[key] = clamp(self.state[key] + delta)
+        self.event_popup = {"text": event["text"], "age": 0.0}
+        self.add_log("事件扰动：" + event["text"] + " 稳态不是静止，而是在扰动中重新调配。")
+        self.apply_homeostatic_pressure()
+
     def execute_turn(self):
-        if self.mode != "playing" or self.input_locked or len(self.selected) != 2:
+        if self.screen_state != SCREEN_GAME or self.input_locked or len(self.selected) != 2:
             return
         chosen = [CARDS[i] for i in self.selected]
         explanations = []
@@ -518,6 +677,8 @@ class Game:
                     edges.append((a, b))
         self.apply_homeostatic_pressure()
         self.turn += 1
+        if self.turn % 3 == 0:
+            self.apply_event()
         self.active_nodes = list(active)
         self.active_edges = edges
         self.path_timer = self.path_duration
@@ -563,7 +724,7 @@ class Game:
         for key in STATE_KEYS:
             self.display_state[key] = approach(self.display_state[key], self.state[key], self.STATUS_SMOOTH_SPEED, dt)
         for i, rect in enumerate(self.card_rects()):
-            hovered = rect.collidepoint(mouse) and 150 <= mouse[1] <= 492 and self.mode == "playing" and not self.input_locked
+            hovered = rect.collidepoint(mouse) and 150 <= mouse[1] <= 492 and self.screen_state == SCREEN_GAME and not self.input_locked
             self.card_anim[i]["hover"] = approach(self.card_anim[i]["hover"], 1.0 if hovered else 0.0, self.CARD_ANIM_SPEED, dt)
             self.card_anim[i]["select"] = approach(self.card_anim[i]["select"], 1.0 if i in self.selected else 0.0, self.CARD_ANIM_SPEED, dt)
             self.card_anim[i]["flash"] = max(0.0, self.card_anim[i]["flash"] - dt * 2.5)
@@ -571,6 +732,10 @@ class Game:
             item["age"] += dt
             item["y"] = approach(item["y"], 0.0, 12.0, dt)
             item["alpha"] = approach(item["alpha"], 255.0, self.LOG_FADE_SPEED, dt)
+        if self.event_popup:
+            self.event_popup["age"] += dt
+            if self.event_popup["age"] > 2.4:
+                self.event_popup = None
         if self.path_timer > 0:
             self.path_timer = max(0.0, self.path_timer - dt)
         elif self.active_edges and not self.input_locked:
@@ -582,7 +747,8 @@ class Game:
                 self.input_locked = False
                 if self.pending_result:
                     self.pending_result = False
-                    self.mode = "result"
+                    self.result_from_level = self.level_index
+                    self.screen_state = SCREEN_RESULT
 
     def draw_panel(self, rect, accent=CYAN):
         pulse = 0.45 + 0.25 * math.sin(self.time * 1.6)
@@ -606,6 +772,120 @@ class Game:
                 a = int(alpha * (r / radius) ** 2)
                 pygame.draw.circle(glow, (*color, a), (radius, radius), r)
             self.screen.blit(glow, (center[0] - radius, center[1] - radius))
+
+    def draw_menu_button(self, rect, text, accent=CYAN, enabled=True):
+        self.draw_button(rect, text, enabled, accent)
+        return rect
+
+    def draw_title(self):
+        self.draw_background()
+        core = (WIDTH // 2, 245)
+        for i in range(7):
+            angle = self.time * (0.35 + i * 0.04) + i
+            radius = 82 + i * 18
+            x = core[0] + math.cos(angle) * radius
+            y = core[1] + math.sin(angle * 0.8) * radius * 0.38
+            pygame.draw.circle(self.screen, (*CYAN, 120), (int(x), int(y)), 3 + i % 3)
+            pygame.draw.line(self.screen, (38, 108, 150), core, (int(x), int(y)), 1)
+        draw_soft_glow(self.screen, pygame.Rect(core[0] - 90, core[1] - 90, 180, 180), CYAN, 45, 90)
+        pygame.draw.circle(self.screen, (19, 39, 78), core, 58)
+        pygame.draw.circle(self.screen, CYAN, core, 58, 2)
+        title_alpha = 0.75 + 0.25 * math.sin(self.time * 1.4)
+        draw_text(self.screen, "代谢之城 Cell City", self.font_title, mix(TEXT, CYAN, title_alpha * 0.25), (410, 95))
+        draw_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_md, MUTED, (438, 145))
+        draw_text(self.screen, "分子有代谢，反应成生命。", self.font_lg, CYAN, (470, 410))
+        buttons = [
+            ("开始游戏", SCREEN_MAIN_MENU),
+            ("教程模式", SCREEN_TUTORIAL),
+            ("生化图鉴", SCREEN_ENCYCLOPEDIA),
+            ("退出游戏", "QUIT"),
+        ]
+        self.title_buttons = []
+        for i, (label, target) in enumerate(buttons):
+            rect = pygame.Rect(520, 468 + i * 54, 240, 42)
+            self.draw_menu_button(rect, label, CYAN if i == 0 else VIOLET)
+            self.title_buttons.append((rect, target))
+        pygame.display.flip()
+
+    def draw_main_menu(self):
+        self.draw_background()
+        self.draw_panel(pygame.Rect(330, 100, 620, 500), VIOLET)
+        draw_text(self.screen, "主菜单", self.font_title, TEXT, (575, 150))
+        items = [
+            ("剧情模式", SCREEN_SCENARIO_SELECT, CYAN, True),
+            ("挑战模式（开发中）", None, VIOLET, False),
+            ("教程模式", SCREEN_TUTORIAL, VIOLET, True),
+            ("生化图鉴", SCREEN_ENCYCLOPEDIA, VIOLET, True),
+            ("返回标题", SCREEN_TITLE, VIOLET, True),
+        ]
+        self.menu_buttons = []
+        for i, (label, target, color, enabled) in enumerate(items):
+            rect = pygame.Rect(500, 235 + i * 62, 280, 44)
+            self.draw_menu_button(rect, label, color, enabled)
+            self.menu_buttons.append((rect, target, enabled))
+        pygame.display.flip()
+
+    def draw_tutorial(self):
+        pages = [
+            ("状态条说明", ["ATP：能量供应", "Glucose：糖代谢底物", "NADH：呼吸链燃料", "NADPH：抗氧化与合成代谢能力", "ROS / NH3：代谢压力", "Cell Health：细胞稳态水平"]),
+            ("操作说明", ["每回合选择 2 张行动卡牌", "点击“执行本回合”更新状态", "观察代谢地图路径高亮和状态变化", "事件扰动会迫使你重新调配资源"]),
+            ("胜利逻辑", ["不要追求单一指标最大化", "ATP 过低会失败", "ROS / NH3 过高会伤害细胞", "真正目标是动态稳态"]),
+        ]
+        self.draw_background()
+        self.draw_panel(pygame.Rect(170, 90, 940, 520), CYAN)
+        title, lines = pages[self.tutorial_page]
+        draw_text(self.screen, f"教程 {self.tutorial_page + 1}/3：{title}", self.font_title, TEXT, (230, 145))
+        y = 230
+        for line in lines:
+            draw_text(self.screen, "• " + line, self.font_md, CYAN if ":" in line or "：" in line else TEXT, (270, y))
+            y += 56
+        self.tutorial_prev = pygame.Rect(250, 540, 130, 42)
+        self.tutorial_next = pygame.Rect(900, 540, 130, 42)
+        self.tutorial_back = pygame.Rect(565, 540, 150, 42)
+        self.draw_menu_button(self.tutorial_prev, "上一页", VIOLET, self.tutorial_page > 0)
+        self.draw_menu_button(self.tutorial_next, "下一页", VIOLET, self.tutorial_page < 2)
+        self.draw_menu_button(self.tutorial_back, "返回", CYAN)
+        pygame.display.flip()
+
+    def draw_scenario_select(self):
+        self.draw_background()
+        draw_text(self.screen, "选择生理情境", self.font_title, TEXT, (48, 42))
+        draw_text(self.screen, "每个关卡都是一次稳态调度问题。完成后会解锁对应图鉴高亮。", self.font_sm, MUTED, (52, 92))
+        self.scenario_rects = []
+        for i, level in enumerate(LEVELS):
+            meta = SCENARIO_META[i]
+            col = i % 3
+            row = i // 3
+            rect = pygame.Rect(54 + col * 400, 145 + row * 235, 360, 190)
+            self.scenario_rects.append(rect)
+            self.draw_panel(rect, CYAN if i not in self.completed_levels else GREEN)
+            draw_text(self.screen, f"{i + 1}. {level['name']}", self.font_md, TEXT, (rect.x + 18, rect.y + 16))
+            draw_text(self.screen, meta["subtitle"], self.font_sm, CYAN, (rect.x + 18, rect.y + 48))
+            draw_wrapped(self.screen, "背景：" + level["context"], self.font_xs, MUTED, pygame.Rect(rect.x + 18, rect.y + 76, 320, 36), 2)
+            draw_wrapped(self.screen, "核心：" + meta["knowledge"], self.font_xs, TEXT, pygame.Rect(rect.x + 18, rect.y + 116, 320, 34), 2)
+            draw_text(self.screen, "★" * meta["stars"] + "☆" * (5 - meta["stars"]), self.font_sm, AMBER, (rect.x + 18, rect.y + 154))
+            if i in self.completed_levels:
+                draw_text(self.screen, "已完成", self.font_sm, GREEN, (rect.x + 280, rect.y + 154))
+        self.scenario_back = pygame.Rect(1040, 640, 150, 42)
+        self.draw_menu_button(self.scenario_back, "返回菜单", VIOLET)
+        pygame.display.flip()
+
+    def draw_encyclopedia(self):
+        self.draw_background()
+        draw_text(self.screen, "生化图鉴", self.font_title, TEXT, (48, 38))
+        draw_text(self.screen, "已完成关卡相关卡片会以绿色标记。", self.font_sm, MUTED, (52, 86))
+        for i, card in enumerate(ENCYCLOPEDIA):
+            col = i % 2
+            row = i // 2
+            rect = pygame.Rect(54 + col * 600, 125 + row * 105, 560, 88)
+            highlighted = card["level"] in self.completed_levels
+            self.draw_panel(rect, GREEN if highlighted else VIOLET)
+            draw_text(self.screen, f"{card['name']}：{card['title']}", self.font_sm, GREEN if highlighted else CYAN, (rect.x + 14, rect.y + 10))
+            draw_wrapped(self.screen, card["explain"] + " " + card["role"], self.font_xs, TEXT, pygame.Rect(rect.x + 14, rect.y + 34, 520, 24), 1)
+            draw_text(self.screen, "思想：" + card["idea"], self.font_xs, MUTED, (rect.x + 14, rect.y + 63))
+        self.encyclopedia_back = pygame.Rect(1050, 650, 150, 42)
+        self.draw_menu_button(self.encyclopedia_back, "返回", CYAN)
+        pygame.display.flip()
 
     def draw_top(self):
         rect = pygame.Rect(18, 14, 1244, 82)
@@ -727,6 +1007,23 @@ class Game:
         text_surface = self.font_sm.render(text, True, label_color)
         self.screen.blit(text_surface, (draw_rect.centerx - text_surface.get_width() // 2, draw_rect.centery - text_surface.get_height() // 2))
 
+    def draw_hormone_panel(self):
+        draw_text(self.screen, "激素 / 全局调控", self.font_xs, VIOLET, (960, 572))
+        self.hormone_rects = []
+        modes = list(HORMONE_MODES.keys())
+        for i, mode in enumerate(modes):
+            rect = pygame.Rect(960 + (i % 3) * 86, 594 + (i // 3) * 28, 78, 22)
+            enabled = self.can_switch_hormone() or mode == self.hormone_mode
+            active = mode == self.hormone_mode
+            color = CYAN if active else VIOLET
+            rounded_rect(self.screen, rect, (19, 39, 78) if active else (20, 28, 55), 7, color if enabled else (71, 85, 105), 1)
+            label = mode if mode != "Adrenaline" else "Adren."
+            text_surface = self.font_xs.render(label, True, TEXT if enabled else MUTED)
+            self.screen.blit(text_surface, (rect.centerx - text_surface.get_width() // 2, rect.centery - text_surface.get_height() // 2))
+            self.hormone_rects.append((rect, mode))
+        desc = HORMONE_MODES[self.hormone_mode]["desc"]
+        draw_wrapped(self.screen, desc, self.font_xs, MUTED, pygame.Rect(960, 650, 260, 30), 1)
+
     def draw_log(self):
         rect = pygame.Rect(18, 558, 1244, 144)
         self.draw_panel(rect, CYAN)
@@ -742,86 +1039,195 @@ class Game:
             draw_wrapped(temp, item["text"], self.font_sm, (*TEXT, alpha), pygame.Rect(6, 3, 900, 26), 2)
             self.screen.blit(temp, (30, int(y + item["y"])))
             y += 30
-        self.execute_rect = pygame.Rect(960, 610, 132, 42)
-        self.next_rect = pygame.Rect(1110, 610, 112, 42)
-        can_execute = len(self.selected) == 2 and self.mode == "playing" and not self.input_locked
+        self.draw_hormone_panel()
+        self.execute_rect = pygame.Rect(960, 690, 132, 30)
+        self.next_rect = pygame.Rect(1110, 690, 112, 30)
+        can_execute = len(self.selected) == 2 and self.screen_state == SCREEN_GAME and not self.input_locked
         self.draw_button(self.execute_rect, "执行本回合", can_execute, CYAN)
         self.draw_button(self.next_rect, "下一关", not self.input_locked, VIOLET)
         if self.level.get("modifier"):
-            draw_wrapped(self.screen, self.level["modifier"]["note"], self.font_xs, AMBER, pygame.Rect(960, 666, 260, 22), 1)
+            draw_wrapped(self.screen, self.level["modifier"]["note"], self.font_xs, AMBER, pygame.Rect(36, 682, 880, 20), 1)
+        if self.event_popup:
+            alpha = max(0.0, 1.0 - self.event_popup["age"] / 2.4)
+            popup = pygame.Rect(350, 515, 580, 42)
+            draw_soft_glow(self.screen, popup, AMBER, strength=22, radius=10)
+            rounded_rect(self.screen, popup, (58, 41, 15), 10, AMBER, 1)
+            draw_wrapped(self.screen, self.event_popup["text"], self.font_sm, mix(AMBER, TEXT, alpha * 0.5), pygame.Rect(370, 526, 540, 18), 1)
 
     def draw_result(self):
-        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        overlay.fill((2, 6, 23, 210))
-        self.screen.blit(overlay, (0, 0))
-        box = pygame.Rect(250, 130, 780, 460)
+        self.draw_background()
+        box = pygame.Rect(150, 80, 980, 560)
         draw_soft_glow(self.screen, box, CYAN, strength=35, radius=16)
         rounded_rect(self.screen, box, (8, 13, 32), 16, CYAN, 2)
         score, passed, maxim = self.evaluate()
+        grade = "S" if score >= 90 else "A" if score >= 75 else "B" if score >= 55 else "C"
         title = "稳态达成" if passed else "稳态失衡"
-        draw_text(self.screen, title, self.font_title, GREEN if passed else AMBER, (290, 165))
-        draw_text(self.screen, f"评分：{score}", self.font_lg, VIOLET, (780, 170))
-        y = 230
-        for key, op, value in self.level["goals"]:
-            ok = self.goal_met((key, op, value))
-            text = f"{'达成' if ok else '未达成'}：{key} {op} {value}，当前 {self.state[key]}"
-            draw_text(self.screen, text, self.font_md, GREEN if ok else RED, (300, y))
-            y += 35
-        draw_wrapped(self.screen, "生化之道：" + maxim, self.font_md, CYAN, pygame.Rect(300, 380, 680, 70), 6)
-        self.retry_rect = pygame.Rect(565, 510, 130, 44)
-        self.result_next_rect = pygame.Rect(720, 510, 150, 44)
+        draw_text(self.screen, f"{self.level['name']} · {title}", self.font_title, GREEN if passed else AMBER, (205, 120))
+        draw_text(self.screen, f"评分：{grade}  ({score})", self.font_lg, VIOLET, (850, 130))
+        metrics = [
+            ("ATP 稳定性", self.state["ATP"], self.state["ATP"] >= 50),
+            ("血糖控制", self.state["Glucose"], 35 <= self.state["Glucose"] <= 70),
+            ("ROS 控制", self.state["ROS"], self.state["ROS"] <= 55),
+            ("NH3 控制", self.state["NH3"], self.state["NH3"] <= 50),
+            ("Cell Health", self.state["CellHealth"], self.state["CellHealth"] >= 70),
+        ]
+        y = 210
+        for label, value, ok in metrics:
+            color = GREEN if ok else AMBER
+            draw_text(self.screen, f"{label}: {value}", self.font_md, color, (220, y))
+            pygame.draw.rect(self.screen, (22, 31, 58), pygame.Rect(420, y + 8, 260, 10), border_radius=6)
+            pygame.draw.rect(self.screen, color, pygame.Rect(420, y + 8, int(260 * value / 100), 10), border_radius=6)
+            y += 46
+        summary = SCENARIO_META[self.level_index]["summary"] + " " + maxim
+        draw_wrapped(self.screen, summary, self.font_md, TEXT, pygame.Rect(720, 215, 350, 190), 8)
+        self.retry_rect = pygame.Rect(230, 548, 130, 44)
+        self.result_next_rect = pygame.Rect(390, 548, 130, 44)
+        self.result_select_rect = pygame.Rect(550, 548, 170, 44)
+        self.result_book_rect = pygame.Rect(750, 548, 170, 44)
         self.draw_button(self.retry_rect, "重试本关", True, VIOLET)
-        self.draw_button(self.result_next_rect, "进入下一关", True, CYAN)
+        self.draw_button(self.result_next_rect, "下一关", True, CYAN)
+        self.draw_button(self.result_select_rect, "返回关卡选择", True, VIOLET)
+        self.draw_button(self.result_book_rect, "查看相关图鉴", True, VIOLET)
+        pygame.display.flip()
 
     def draw_final(self):
-        overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        overlay.fill((2, 6, 23, 230))
-        self.screen.blit(overlay, (0, 0))
+        self.draw_background()
         box = pygame.Rect(210, 95, 860, 530)
         draw_soft_glow(self.screen, box, VIOLET, strength=40, radius=18)
         rounded_rect(self.screen, box, (8, 13, 32), 18, VIOLET, 2)
-        draw_text(self.screen, "通关总结", self.font_title, CYAN, (260, 145))
-        summary = "代谢不是追求单一最大化，而是在能量、物质、还原力、毒性和环境需求之间维持动态平衡。"
-        draw_wrapped(self.screen, summary, self.font_lg, TEXT, pygame.Rect(260, 215, 760, 100), 8)
+        draw_text(self.screen, "通关总结：代谢之道", self.font_title, CYAN, (260, 145))
+        summary = "代谢不是追求单一最大化。ATP 并非越高越好，呼吸链越强也可能带来 ROS；葡萄糖不只是燃料，也可以储存或转入 PPP；氨基酸可以供能，但氨基必须安全排出；脂肪是高效能源，却需要在合适情境下动员。"
+        draw_wrapped(self.screen, summary, self.font_md, TEXT, pygame.Rect(260, 215, 760, 120), 8)
         items = ["抓住关键", "动态平衡", "响应需求", "藏器于势", "逆势而行", "分合自然"]
         for i, item in enumerate(items):
             x = 285 + (i % 3) * 235
-            y = 355 + (i // 3) * 72
+            y = 370 + (i // 3) * 72
             r = pygame.Rect(x, y, 180, 46)
             rounded_rect(self.screen, r, (24, 38, 80), 10, CYAN if i % 2 == 0 else VIOLET, 1)
             draw_text(self.screen, item, self.font_md, TEXT, (x + 48, y + 11))
-        self.final_restart_rect = pygame.Rect(550, 540, 180, 44)
+        self.final_title_rect = pygame.Rect(370, 545, 140, 42)
+        self.final_book_rect = pygame.Rect(565, 545, 140, 42)
+        self.final_restart_rect = pygame.Rect(760, 545, 140, 42)
+        self.draw_button(self.final_title_rect, "返回标题", True, VIOLET)
+        self.draw_button(self.final_book_rect, "查看图鉴", True, VIOLET)
         self.draw_button(self.final_restart_rect, "重新开始", True, CYAN)
+        pygame.display.flip()
 
     def draw(self):
+        if self.screen_state == SCREEN_TITLE:
+            self.draw_title()
+            return
+        if self.screen_state == SCREEN_MAIN_MENU:
+            self.draw_main_menu()
+            return
+        if self.screen_state == SCREEN_TUTORIAL:
+            self.draw_tutorial()
+            return
+        if self.screen_state == SCREEN_SCENARIO_SELECT:
+            self.draw_scenario_select()
+            return
+        if self.screen_state == SCREEN_ENCYCLOPEDIA:
+            self.draw_encyclopedia()
+            return
+        if self.screen_state == SCREEN_RESULT:
+            self.draw_result()
+            return
+        if self.screen_state == SCREEN_FINAL_SUMMARY:
+            self.draw_final()
+            return
+        self.draw_game()
+        pygame.display.flip()
+
+    def draw_game(self):
         self.draw_background()
         self.draw_top()
         self.draw_status()
         self.draw_map()
         self.draw_cards()
         self.draw_log()
-        if self.mode == "result":
-            self.draw_result()
-        elif self.mode == "final":
-            self.draw_final()
-        pygame.display.flip()
 
-    def handle_click(self, pos):
-        if self.mode == "result":
-            if self.retry_rect.collidepoint(pos):
-                self.reset_level()
-            elif self.result_next_rect.collidepoint(pos):
+    def handle_title_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for rect, target in getattr(self, "title_buttons", []):
+                if rect.collidepoint(event.pos):
+                    if target == "QUIT":
+                        pygame.quit()
+                        sys.exit()
+                    if target == SCREEN_ENCYCLOPEDIA:
+                        self.encyclopedia_return = SCREEN_TITLE
+                    self.screen_state = target
+
+    def handle_main_menu_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for rect, target, enabled in getattr(self, "menu_buttons", []):
+                if enabled and rect.collidepoint(event.pos):
+                    if target == SCREEN_ENCYCLOPEDIA:
+                        self.encyclopedia_return = SCREEN_MAIN_MENU
+                    self.screen_state = target
+
+    def handle_tutorial_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.tutorial_prev.collidepoint(event.pos) and self.tutorial_page > 0:
+                self.tutorial_page -= 1
+            elif self.tutorial_next.collidepoint(event.pos) and self.tutorial_page < 2:
+                self.tutorial_page += 1
+            elif self.tutorial_back.collidepoint(event.pos):
+                self.screen_state = SCREEN_MAIN_MENU
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_LEFT:
+                self.tutorial_page = max(0, self.tutorial_page - 1)
+            elif event.key == pygame.K_RIGHT:
+                self.tutorial_page = min(2, self.tutorial_page + 1)
+            elif event.key == pygame.K_ESCAPE:
+                self.screen_state = SCREEN_MAIN_MENU
+
+    def handle_scenario_select_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.scenario_back.collidepoint(event.pos):
+                self.screen_state = SCREEN_MAIN_MENU
+                return
+            for i, rect in enumerate(getattr(self, "scenario_rects", [])):
+                if rect.collidepoint(event.pos):
+                    self.start_level(i)
+                    return
+
+    def handle_encyclopedia_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.encyclopedia_back.collidepoint(event.pos):
+                self.screen_state = self.encyclopedia_return
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.screen_state = self.encyclopedia_return
+
+    def handle_result_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.retry_rect.collidepoint(event.pos):
+                self.start_level(self.level_index)
+            elif self.result_next_rect.collidepoint(event.pos):
+                self.completed_levels.add(self.level_index)
                 if self.level_index < len(LEVELS) - 1:
-                    self.level_index += 1
-                    self.reset_level()
+                    self.start_level(self.level_index + 1)
                 else:
-                    self.mode = "final"
-            return
-        if self.mode == "final":
-            if self.final_restart_rect.collidepoint(pos):
-                self.level_index = 0
-                self.reset_level()
-            return
+                    self.screen_state = SCREEN_FINAL_SUMMARY
+            elif self.result_select_rect.collidepoint(event.pos):
+                self.completed_levels.add(self.level_index)
+                self.screen_state = SCREEN_SCENARIO_SELECT
+            elif self.result_book_rect.collidepoint(event.pos):
+                self.completed_levels.add(self.level_index)
+                self.encyclopedia_return = SCREEN_RESULT
+                self.screen_state = SCREEN_ENCYCLOPEDIA
+
+    def handle_final_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.final_title_rect.collidepoint(event.pos):
+                self.screen_state = SCREEN_TITLE
+            elif self.final_book_rect.collidepoint(event.pos):
+                self.encyclopedia_return = SCREEN_FINAL_SUMMARY
+                self.screen_state = SCREEN_ENCYCLOPEDIA
+            elif self.final_restart_rect.collidepoint(event.pos):
+                self.completed_levels.clear()
+                self.start_level(0)
+
+    def handle_game_click(self, pos):
         if self.input_locked:
             return
         if self.execute_rect.collidepoint(pos):
@@ -832,8 +1238,12 @@ class Game:
                 self.level_index += 1
                 self.reset_level()
             else:
-                self.mode = "final"
+                self.screen_state = SCREEN_FINAL_SUMMARY
             return
+        for rect, mode in getattr(self, "hormone_rects", []):
+            if rect.collidepoint(pos):
+                self.set_hormone_mode(mode)
+                return
         for i, rect in enumerate(self.card_rects()):
             if rect.collidepoint(pos) and 150 <= pos[1] <= 492:
                 if i in self.selected:
@@ -841,6 +1251,37 @@ class Game:
                 elif len(self.selected) < 2:
                     self.selected.append(i)
                 return
+
+    def handle_game_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.handle_game_click(event.pos)
+        if event.type == pygame.MOUSEWHEEL:
+            self.handle_wheel(event.y)
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+            self.execute_turn()
+
+    def handle_event(self, event):
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            if self.screen_state == SCREEN_GAME:
+                self.screen_state = SCREEN_SCENARIO_SELECT
+                return
+            if self.screen_state in (SCREEN_MAIN_MENU, SCREEN_TUTORIAL, SCREEN_SCENARIO_SELECT, SCREEN_ENCYCLOPEDIA):
+                self.screen_state = SCREEN_TITLE
+                return
+        handlers = {
+            SCREEN_TITLE: self.handle_title_event,
+            SCREEN_MAIN_MENU: self.handle_main_menu_event,
+            SCREEN_TUTORIAL: self.handle_tutorial_event,
+            SCREEN_SCENARIO_SELECT: self.handle_scenario_select_event,
+            SCREEN_GAME: self.handle_game_event,
+            SCREEN_RESULT: self.handle_result_event,
+            SCREEN_ENCYCLOPEDIA: self.handle_encyclopedia_event,
+            SCREEN_FINAL_SUMMARY: self.handle_final_event,
+        }
+        handlers.get(self.screen_state, self.handle_game_event)(event)
 
     def handle_wheel(self, y):
         mx, my = pygame.mouse.get_pos()
@@ -852,19 +1293,7 @@ class Game:
         while True:
             dt = self.clock.tick(FPS) / 1000.0
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    self.handle_click(event.pos)
-                if event.type == pygame.MOUSEWHEEL:
-                    self.handle_wheel(event.y)
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        pygame.quit()
-                        sys.exit()
-                    if event.key == pygame.K_RETURN:
-                        self.execute_turn()
+                self.handle_event(event)
             self.update(dt)
             self.draw()
 

@@ -1,6 +1,6 @@
 # 代谢之城 Cell City
 
-这是一个 Python 3 + pygame 实现的 Windows 桌面小游戏。游戏采用回合制资源管理机制表达代谢生物化学思想，玩家扮演细胞代谢调度官，在不同生理情境下调控糖代谢、脂质代谢、氨基酸代谢和生物氧化，使细胞维持稳态。
+这是一个 Python 3 + pygame 实现的 Windows 桌面小游戏。玩家扮演细胞代谢调度官，在不同生理情境下调控糖代谢、脂质代谢、氨基酸代谢和生物氧化，使细胞维持稳态。
 
 ## 本机运行
 
@@ -27,9 +27,20 @@ python -m PyInstaller --onefile --windowed --name "代谢之城 Cell City" main.
 
 ## 文件说明
 
-- `main.py`：完整 pygame 游戏代码，包含关卡、卡牌、状态、地图、交互和结算。
+- `main.py`：完整 pygame 游戏代码，包含界面状态机、关卡、卡牌、事件、激素模式、状态、地图、交互和结算。
 - `requirements.txt`：pygame 与 PyInstaller 依赖。
 - `build_exe.bat`：一键打包脚本。
+
+## 界面流程
+
+- `TITLE`：开始界面。
+- `MAIN_MENU`：主菜单。
+- `TUTORIAL`：三页教程。
+- `SCENARIO_SELECT`：五个生理情境关卡选择。
+- `GAME`：回合制代谢调度主界面。
+- `RESULT`：关卡结算。
+- `ENCYCLOPEDIA`：生化图鉴。
+- `FINAL_SUMMARY`：最终总结。
 
 ## 动效参数
 
