@@ -17,6 +17,22 @@ npm run dev
 npm run build
 ```
 
+## 打包 Windows 桌面应用
+
+开发时打开 Electron：
+
+```bash
+npm run electron:dev
+```
+
+打包为 Windows x64 portable exe：
+
+```bash
+npm run dist
+```
+
+打包完成后，可执行文件会输出到 `release` 目录，老师电脑不需要安装 Node.js、npm 或 VSCode，直接双击 exe 即可运行。
+
 ## 内容位置
 
 - 关卡数据：`src/data/levels.ts`

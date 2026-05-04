@@ -1,11 +1,15 @@
 {
   "name": "metabolic-city",
+  "productName": "代谢之城 Cell City",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "dist": "npm run build && electron-builder --win portable",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -19,5 +23,34 @@
     "autoprefixer": "^10.4.20",
     "lucide-react": "^0.468.0"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.metaboliccity.cellcity",
+    "productName": "代谢之城 Cell City",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "代谢之城 Cell City-${version}-win-x64-portable.${ext}"
+    }
+  }
 }
