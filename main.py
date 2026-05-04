@@ -254,6 +254,22 @@ SCREEN_GAME = "GAME"
 SCREEN_RESULT = "RESULT"
 SCREEN_ENCYCLOPEDIA = "ENCYCLOPEDIA"
 SCREEN_FINAL_SUMMARY = "FINAL_SUMMARY"
+SCREEN_ABOUT = "ABOUT"
+SCREEN_CHALLENGE_SETUP = "CHALLENGE_SETUP"
+SCREEN_CHALLENGE_RESULT = "CHALLENGE_RESULT"
+
+AUTHOR_NAME = "刘培锐"
+AUTHOR_ID = "525714910036"
+AUTHOR_LINE = f"作者：{AUTHOR_NAME}｜学号：{AUTHOR_ID}"
+
+TITLE_QUOTES = [
+    "分子有代谢，反应成生命。",
+    "ATP 不是越多越好，稳态才是目标。",
+    "糖、脂、氨基酸，终将在代谢网络中相遇。",
+    "呼吸链既能供能，也可能制造 ROS。",
+    "氨基酸的碳骨架可回归共性，氨基却必须安全排出。",
+    "生命的智慧，是在扰动中维持秩序。",
+]
 
 SCENARIO_META = [
     {
@@ -356,6 +372,69 @@ ENCYCLOPEDIA = [
     {"name": "ROS", "title": "产能系统的副产物", "explain": "电子传递过程可能产生 ROS，过量会损伤细胞。", "role": "限制呼吸链和 β-氧化滥用。", "idea": "效率与风险常常同源。", "level": 3},
     {"name": "尿素循环", "title": "清除氨毒性", "explain": "尿素循环消耗 ATP，把有毒的氨转化为尿素排出。", "role": "高蛋白饮食和饥饿中保护 CellHealth。", "idea": "牺牲能量以维持安全。", "level": 4},
     {"name": "氨基酸碳骨架", "title": "回归糖脂能量网络", "explain": "氨基酸脱氨后，碳骨架可进入 TCA 或糖异生。", "role": "连接蛋白质分解、糖异生和 TCA。", "idea": "个性归氮，共性归碳。", "level": 4},
+    {"name": "稳态 Homeostasis", "title": "扰动中的变量控制", "explain": "生命系统不是保持静止，而是在扰动中通过反馈调控维持变量范围。", "role": "挑战模式中稳定连击的核心思想。", "idea": "稳态是动态的。", "level": "challenge"},
+    {"name": "代谢重编程", "title": "Metabolic Reprogramming", "explain": "细胞会根据环境和需求改变通路偏好。", "role": "激素模式和挑战主题体现不同通路偏好。", "idea": "环境改变，路径随之改写。", "level": "challenge"},
+    {"name": "氧化还原平衡", "title": "Redox Balance", "explain": "NADH 主要连接供能，NADPH 主要连接抗氧化和合成。", "role": "区分呼吸链供能与 PPP 抗氧化。", "idea": "还原力有不同用途。", "level": "challenge"},
+    {"name": "毒性管理", "title": "Toxicity Management", "explain": "NH3 和 ROS 等副产物必须被及时处理，否则供能优势会转化为损伤。", "role": "挑战模式风险等级的重要来源。", "idea": "副产物也是代谢账本。", "level": "challenge"},
+]
+
+CHALLENGE_THEMES = [
+    {
+        "name": "随机扰动",
+        "desc": "每局随机生成初始状态和事件池。",
+        "stars": 3,
+        "random": True,
+    },
+    {
+        "name": "能量危机",
+        "desc": "ATP 初始偏低，呼吸链效率不稳定。",
+        "stars": 3,
+        "initial": {"ATP": 28, "Glucose": 52, "Glycogen": 35, "Fat": 60, "AminoAcidPool": 45, "NADH": 38, "NADPH": 42, "ROS": 28, "NH3": 20, "CellHealth": 82},
+    },
+    {
+        "name": "氧化风暴",
+        "desc": "ROS 初始偏高，呼吸链使用风险更大。",
+        "stars": 4,
+        "initial": {"ATP": 55, "Glucose": 58, "Glycogen": 40, "Fat": 55, "AminoAcidPool": 45, "NADH": 70, "NADPH": 22, "ROS": 68, "NH3": 20, "CellHealth": 78},
+    },
+    {
+        "name": "氨毒压力",
+        "desc": "NH3 初始偏高，高蛋白事件频繁出现。",
+        "stars": 4,
+        "initial": {"ATP": 52, "Glucose": 50, "Glycogen": 38, "Fat": 48, "AminoAcidPool": 78, "NADH": 42, "NADPH": 40, "ROS": 25, "NH3": 70, "CellHealth": 80},
+    },
+    {
+        "name": "极限饥饿",
+        "desc": "Glucose 和 Glycogen 初始很低，必须依赖脂肪动员和糖异生。",
+        "stars": 4,
+        "initial": {"ATP": 42, "Glucose": 22, "Glycogen": 8, "Fat": 82, "AminoAcidPool": 58, "NADH": 35, "NADPH": 38, "ROS": 25, "NH3": 25, "CellHealth": 76},
+    },
+]
+
+CHALLENGE_EVENTS = [
+    {"name": "血糖波动", "text": "外源葡萄糖输入不稳定。代谢调控必须适应外界输入扰动。", "random_glucose": True},
+    {"name": "氧供波动", "text": "氧气供应短暂下降，呼吸链效率降低。氧化供能依赖环境条件。", "effect": {"ROS": 6}, "etc_penalty": 0.7},
+    {"name": "运动需求上升", "text": "细胞能量消耗突然增加。需求变化会重塑代谢流。", "effect": {"ATP": -14, "Glucose": -6}},
+    {"name": "抗氧化压力", "text": "细胞需要更多还原力处理氧化损伤。NADPH 是氧化还原稳态的重要货币。", "effect": {"NADPH": -8, "ROS": 10}},
+    {"name": "蛋白质动员", "text": "蛋白质分解补充代谢底物。氨基酸既是资源，也带来氨毒性。", "effect": {"AminoAcidPool": 12, "NH3": 8}},
+    {"name": "脂肪酸输入增加", "text": "脂肪动员增强，提供长期能源。脂肪供能高效，但依赖氧化系统承接。", "effect": {"Fat": -8, "NADH": 10, "ROS": 3}},
+    {"name": "胰岛素样信号", "text": "细胞偏向储能和利用葡萄糖。富足时分流与储备。", "effect": {"Glucose": -6, "Glycogen": 8}},
+    {"name": "胰高血糖素样信号", "text": "细胞偏向动员储备以维持血糖。饥饿时维持关键底物供应。", "effect": {"Glycogen": -8, "Glucose": 10}},
+]
+
+CHALLENGE_CRISIS_EVENTS = [
+    {"name": "线粒体压力", "text": "呼吸链负担过高，电子泄漏增加。提示：考虑 PPP 和抗氧化修复。", "effect": {"ROS": 22, "NADH": -8, "CellHealth": -5}},
+    {"name": "急性能量缺口", "text": "ATP 消耗突然加速。提示：考虑糖酵解、TCA、呼吸链或脂肪供能。", "effect": {"ATP": -25, "CellHealth": -4}},
+    {"name": "氨毒性爆发", "text": "氨基酸分解过度导致 NH3 急升。提示：考虑尿素循环。", "effect": {"NH3": 24, "CellHealth": -5}},
+    {"name": "血糖濒危", "text": "葡萄糖供应不足，关键组织面临能量风险。提示：考虑糖原分解或糖异生。", "effect": {"Glucose": -22, "ATP": -8}},
+    {"name": "氧化还原失衡", "text": "NADPH 储备不足，抗氧化能力下降。提示：考虑 PPP。", "effect": {"NADPH": -18, "ROS": 14}},
+]
+
+CHALLENGE_CARDS = [
+    {"id": "resp_burst", "name": "强化呼吸爆发", "pathway": "Respiratory Burst", "effect": {"NADH": -24, "ATP": 36, "ROS": 18}, "explain": "快速获得大量 ATP，但显著提高 ROS。思想：产能与损伤同源。", "nodes": ["NADH", "ETC", "ATP"]},
+    {"id": "emergency_glu", "name": "紧急糖异生", "pathway": "Emergency Gluconeogenesis", "effect": {"ATP": -18, "AminoAcidPool": -10, "Glucose": 28, "NH3": 10}, "explain": "低血糖时强行维持葡萄糖，但消耗能量并增加氨负荷。思想：逆势而行需要付出代价。", "nodes": ["Amino Acids", "Carbon Skeleton", "Gluconeogenesis", "Glucose"]},
+    {"id": "extreme_redox", "name": "极限抗氧化", "pathway": "Extreme Redox Repair", "effect": {"NADPH": -22, "ROS": -34, "ATP": -4}, "explain": "迅速清除 ROS，但大量消耗还原力。思想：还原力也是稀缺资源。", "nodes": ["NADPH", "Antioxidant", "ROS"]},
+    {"id": "protein_sacrifice", "name": "蛋白质牺牲", "pathway": "Protein Sacrifice", "effect": {"AminoAcidPool": 24, "ATP": 8, "NH3": 18, "CellHealth": -6}, "explain": "通过蛋白质分解补充底物，但损伤细胞结构并增加氨毒性。思想：不能长期依赖。", "nodes": ["Amino Acids", "NH3", "Carbon Skeleton"]},
 ]
 
 MAP_NODES = {
@@ -536,7 +615,7 @@ class Game:
 
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("代谢之城 Cell City")
+        pygame.display.set_caption(f"代谢之城 Cell City - {AUTHOR_NAME}")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
         self.font_xs = load_font(14)
@@ -547,9 +626,24 @@ class Game:
         self.level_index = 0
         self.screen_state = SCREEN_TITLE
         self.tutorial_page = 0
+        self.encyclopedia_scroll = 0
         self.completed_levels = set()
+        self.challenge_completed = False
         self.encyclopedia_return = SCREEN_TITLE
+        self.about_return = SCREEN_TITLE
         self.result_from_level = 0
+        self.challenge_theme_index = 0
+        self.challenge_theme = None
+        self.challenge_seed = ""
+        self.challenge_rng = random.Random()
+        self.is_challenge = False
+        self.challenge_score_bonus = 0
+        self.stable_streak = 0
+        self.max_stable_streak = 0
+        self.max_risk_level = 0
+        self.survived_turns = 0
+        self.challenge_etc_penalty_turns = 0
+        self.challenge_event_alert = None
         self.hormone_mode = "Normal"
         self.hormone_switch_turn = -3
         self.event_popup = None
@@ -557,7 +651,7 @@ class Game:
         self.mode = "playing"
         self.time = 0.0
         self.display_state = {}
-        self.card_anim = [{"hover": 0.0, "select": 0.0, "flash": 0.0} for _ in CARDS]
+        self.card_anim = [{"hover": 0.0, "select": 0.0, "flash": 0.0} for _ in (CARDS + CHALLENGE_CARDS)]
         self.log_items = []
         self.input_locked = False
         self.input_lock_timer = 0.0
@@ -574,6 +668,7 @@ class Game:
         return LEVELS[self.level_index]
 
     def reset_level(self):
+        self.is_challenge = False
         self.state = deepcopy(LEVELS[self.level_index]["initial"])
         self.display_state = {key: float(value) for key, value in self.state.items()}
         self.turn = 0
@@ -597,6 +692,54 @@ class Game:
         self.reset_level()
         self.screen_state = SCREEN_GAME
 
+    def random_challenge_initial(self):
+        return {
+            "ATP": self.challenge_rng.randint(35, 70),
+            "Glucose": self.challenge_rng.randint(25, 75),
+            "Glycogen": self.challenge_rng.randint(10, 60),
+            "Fat": self.challenge_rng.randint(30, 85),
+            "AminoAcidPool": self.challenge_rng.randint(25, 75),
+            "NADH": self.challenge_rng.randint(20, 70),
+            "NADPH": self.challenge_rng.randint(20, 70),
+            "ROS": self.challenge_rng.randint(10, 55),
+            "NH3": self.challenge_rng.randint(10, 55),
+            "CellHealth": 80,
+        }
+
+    def start_challenge(self, theme_index=None):
+        if theme_index is None:
+            theme_index = self.challenge_rng.randrange(len(CHALLENGE_THEMES))
+        self.challenge_theme_index = theme_index
+        self.challenge_theme = CHALLENGE_THEMES[theme_index]
+        self.challenge_seed = f"20260504-{random.randint(1000, 9999)}"
+        self.challenge_rng = random.Random(self.challenge_seed)
+        initial = self.random_challenge_initial() if self.challenge_theme.get("random") else deepcopy(self.challenge_theme["initial"])
+        self.state = initial
+        self.display_state = {key: float(value) for key, value in self.state.items()}
+        self.turn = 0
+        self.selected = []
+        self.card_scroll = 0
+        self.active_nodes = []
+        self.active_edges = []
+        self.path_timer = 0.0
+        self.pending_result = False
+        self.input_locked = False
+        self.input_lock_timer = 0.0
+        self.hormone_mode = "Normal"
+        self.hormone_switch_turn = -3
+        self.event_popup = None
+        self.challenge_event_alert = None
+        self.challenge_score_bonus = 0
+        self.stable_streak = 0
+        self.max_stable_streak = 0
+        self.max_risk_level = 0
+        self.survived_turns = 0
+        self.challenge_etc_penalty_turns = 0
+        self.is_challenge = True
+        self.log_items = []
+        self.add_log(f"挑战开始：{self.challenge_theme['name']}。Seed: {self.challenge_seed}")
+        self.screen_state = SCREEN_GAME
+
     def can_switch_hormone(self):
         return self.turn - self.hormone_switch_turn >= 3 and not self.input_locked
 
@@ -606,6 +749,9 @@ class Game:
         self.hormone_mode = mode
         self.hormone_switch_turn = self.turn
         self.add_log(f"全局调控切换为 {HORMONE_MODES[mode]['label']}：{HORMONE_MODES[mode]['desc']}")
+
+    def current_deck(self):
+        return CARDS + CHALLENGE_CARDS if self.is_challenge else CARDS
 
     def add_log(self, text):
         self.log_items.insert(0, {"text": text, "age": 0.0, "y": -18.0, "alpha": 0.0})
@@ -618,6 +764,9 @@ class Game:
             for key, multiplier in modifier.get("multiplier", {}).items():
                 if key in effect:
                     effect[key] = int(round(effect[key] * multiplier))
+        if self.is_challenge and card["id"] == "etc" and self.challenge_etc_penalty_turns > 0:
+            if "ATP" in effect:
+                effect["ATP"] = int(round(effect["ATP"] * 0.7))
         mode = HORMONE_MODES[self.hormone_mode]
         multiplier = mode["multipliers"].get(card["id"], 1.0)
         if multiplier != 1.0:
@@ -658,10 +807,111 @@ class Game:
         self.add_log("事件扰动：" + event["text"] + " 稳态不是静止，而是在扰动中重新调配。")
         self.apply_homeostatic_pressure()
 
+    def apply_challenge_event(self, crisis=False):
+        event = self.challenge_rng.choice(CHALLENGE_CRISIS_EVENTS if crisis else CHALLENGE_EVENTS)
+        effect = deepcopy(event.get("effect", {}))
+        if event.get("random_glucose"):
+            effect["Glucose"] = self.challenge_rng.choice([12, -10])
+        if event.get("etc_penalty"):
+            self.challenge_etc_penalty_turns = 1
+        for key, delta in effect.items():
+            self.state[key] = clamp(self.state[key] + delta)
+        prefix = "危机事件" if crisis else "随机事件"
+        self.challenge_event_alert = {"text": f"{prefix}：{event['name']}｜{event['text']}", "age": 0.0, "crisis": crisis}
+        self.event_popup = {"text": f"{prefix}：{event['name']}", "age": 0.0}
+        self.add_log(f"{prefix}：{event['name']}。{event['text']}")
+        self.apply_homeostatic_pressure()
+
+    def risk_level(self):
+        risk = 0
+        if self.state["ATP"] < 25:
+            risk += 1
+        if self.state["Glucose"] < 20 or self.state["Glucose"] > 85:
+            risk += 1
+        if self.state["ROS"] > 65:
+            risk += 1
+        if self.state["NH3"] > 65:
+            risk += 1
+        if self.state["CellHealth"] < 50:
+            risk += 1
+        return risk
+
+    def risk_label(self):
+        labels = ["稳定", "警戒", "危险", "高危", "崩溃边缘", "崩溃边缘"]
+        colors = [CYAN, AMBER, (251, 146, 60), RED, RED, RED]
+        risk = self.risk_level()
+        return labels[risk], colors[risk]
+
+    def update_challenge_streak(self):
+        stable = (
+            self.state["ATP"] >= 40
+            and 20 <= self.state["Glucose"] <= 75
+            and self.state["ROS"] <= 65
+            and self.state["NH3"] <= 65
+            and self.state["CellHealth"] >= 60
+        )
+        if stable:
+            self.stable_streak += 1
+            self.max_stable_streak = max(self.max_stable_streak, self.stable_streak)
+            if self.stable_streak == 3:
+                self.state["CellHealth"] = clamp(self.state["CellHealth"] + 5)
+                self.challenge_score_bonus += 100
+                self.add_log("稳态连击 x3：细胞在连续扰动中维持平衡。")
+            elif self.stable_streak == 5:
+                self.state["CellHealth"] = clamp(self.state["CellHealth"] + 8)
+                self.state["ATP"] = clamp(self.state["ATP"] + 5)
+                self.challenge_score_bonus += 200
+                self.challenge_completed = True
+                self.add_log("代谢稳态大师：你没有追求单一路径最大化，而是在多指标之间保持了动态平衡。")
+        else:
+            self.stable_streak = 0
+
+    def update_challenge_pressure(self):
+        if self.state["ATP"] <= 0:
+            self.state["CellHealth"] = clamp(self.state["CellHealth"] - 5)
+            self.add_log("危险：ATP 枯竭，CellHealth 额外下降。")
+        if self.state["ROS"] >= 90 or self.state["NH3"] >= 90:
+            self.state["CellHealth"] = clamp(self.state["CellHealth"] - 4)
+            self.add_log("危险状态：ROS 或 NH3 接近崩溃阈值，持续损伤细胞。")
+
+    def challenge_score(self):
+        score = self.state["CellHealth"] * 8 + self.state["ATP"] * 3 + self.challenge_score_bonus
+        score += 150 if 20 <= self.state["Glucose"] <= 75 else -abs(self.state["Glucose"] - 48) * 4
+        score += 120 if self.state["ROS"] <= 65 else -(self.state["ROS"] - 65) * 6
+        score += 120 if self.state["NH3"] <= 65 else -(self.state["NH3"] - 65) * 6
+        score += self.max_stable_streak * 50
+        if self.survived_turns >= 12:
+            score += 300
+        score -= self.max_risk_level * 80
+        return max(0, int(score))
+
+    def challenge_grade(self, score):
+        if score >= 1200:
+            return "S"
+        if score >= 950:
+            return "A"
+        if score >= 700:
+            return "B"
+        if score >= 450:
+            return "C"
+        return "D"
+
+    def challenge_feedback(self):
+        if self.state["ATP"] > 70 and self.state["ROS"] > 75:
+            return "产能不能脱离稳态约束。"
+        if 20 <= self.state["Glucose"] <= 75 and self.state["ATP"] < 35:
+            return "底物储备不等于有效供能。"
+        if self.state["NH3"] > 70:
+            return "氨基酸供能必须伴随氨基安全排出。"
+        if self.max_stable_streak >= 5:
+            return "你成功在扰动中维持了动态平衡。"
+        return "挑战模式考验的是在随机扰动中维持多指标安全范围。"
+
     def execute_turn(self):
         if self.screen_state != SCREEN_GAME or self.input_locked or len(self.selected) != 2:
             return
-        chosen = [CARDS[i] for i in self.selected]
+        deck = self.current_deck()
+        chosen = [deck[i] for i in self.selected]
         explanations = []
         active = set()
         edges = []
@@ -677,7 +927,18 @@ class Game:
                     edges.append((a, b))
         self.apply_homeostatic_pressure()
         self.turn += 1
-        if self.turn % 3 == 0:
+        if self.is_challenge:
+            if self.challenge_etc_penalty_turns > 0:
+                self.challenge_etc_penalty_turns -= 1
+            if self.turn % 2 == 0:
+                self.apply_challenge_event(False)
+            if self.turn % 4 == 0:
+                self.apply_challenge_event(True)
+            self.update_challenge_pressure()
+            self.update_challenge_streak()
+            self.survived_turns = self.turn
+            self.max_risk_level = max(self.max_risk_level, self.risk_level())
+        elif self.turn % 3 == 0:
             self.apply_event()
         self.active_nodes = list(active)
         self.active_edges = edges
@@ -688,7 +949,10 @@ class Game:
         for index in old_selected:
             self.card_anim[index]["flash"] = 1.0
         self.selected = []
-        if self.turn >= 10 or self.state["CellHealth"] <= 0:
+        limit = 12 if self.is_challenge else 10
+        if self.turn >= limit or self.state["CellHealth"] <= 0:
+            if self.is_challenge and self.turn >= 12 and self.state["CellHealth"] > 0:
+                self.challenge_completed = True
             self.pending_result = True
 
     def goal_met(self, goal):
@@ -736,6 +1000,10 @@ class Game:
             self.event_popup["age"] += dt
             if self.event_popup["age"] > 2.4:
                 self.event_popup = None
+        if self.challenge_event_alert:
+            self.challenge_event_alert["age"] += dt
+            if self.challenge_event_alert["age"] > 3.0:
+                self.challenge_event_alert = None
         if self.path_timer > 0:
             self.path_timer = max(0.0, self.path_timer - dt)
         elif self.active_edges and not self.input_locked:
@@ -748,7 +1016,7 @@ class Game:
                 if self.pending_result:
                     self.pending_result = False
                     self.result_from_level = self.level_index
-                    self.screen_state = SCREEN_RESULT
+                    self.screen_state = SCREEN_CHALLENGE_RESULT if self.is_challenge else SCREEN_RESULT
 
     def draw_panel(self, rect, accent=CYAN):
         pulse = 0.45 + 0.25 * math.sin(self.time * 1.6)
@@ -793,18 +1061,23 @@ class Game:
         title_alpha = 0.75 + 0.25 * math.sin(self.time * 1.4)
         draw_text(self.screen, "代谢之城 Cell City", self.font_title, mix(TEXT, CYAN, title_alpha * 0.25), (410, 95))
         draw_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_md, MUTED, (438, 145))
-        draw_text(self.screen, "分子有代谢，反应成生命。", self.font_lg, CYAN, (470, 410))
+        quote_index = int(self.time // 3) % len(TITLE_QUOTES)
+        fade = 0.55 + 0.45 * abs(math.sin((self.time % 3) / 3 * math.pi))
+        quote_surface = self.font_lg.render(TITLE_QUOTES[quote_index], True, mix(MUTED, CYAN, fade))
+        self.screen.blit(quote_surface, (WIDTH // 2 - quote_surface.get_width() // 2, 410))
         buttons = [
             ("开始游戏", SCREEN_MAIN_MENU),
             ("教程模式", SCREEN_TUTORIAL),
             ("生化图鉴", SCREEN_ENCYCLOPEDIA),
+            ("关于作品", SCREEN_ABOUT),
             ("退出游戏", "QUIT"),
         ]
         self.title_buttons = []
         for i, (label, target) in enumerate(buttons):
-            rect = pygame.Rect(520, 468 + i * 54, 240, 42)
+            rect = pygame.Rect(520, 438 + i * 50, 240, 40)
             self.draw_menu_button(rect, label, CYAN if i == 0 else VIOLET)
             self.title_buttons.append((rect, target))
+        draw_text(self.screen, AUTHOR_LINE, self.font_sm, MUTED, (32, 680))
         pygame.display.flip()
 
     def draw_main_menu(self):
@@ -813,16 +1086,18 @@ class Game:
         draw_text(self.screen, "主菜单", self.font_title, TEXT, (575, 150))
         items = [
             ("剧情模式", SCREEN_SCENARIO_SELECT, CYAN, True),
-            ("挑战模式（开发中）", None, VIOLET, False),
+            ("挑战模式", SCREEN_CHALLENGE_SETUP, CYAN, True),
             ("教程模式", SCREEN_TUTORIAL, VIOLET, True),
             ("生化图鉴", SCREEN_ENCYCLOPEDIA, VIOLET, True),
-            ("返回标题", SCREEN_TITLE, VIOLET, True),
+            ("关于作品", SCREEN_ABOUT, VIOLET, True),
+            ("退出游戏", "QUIT", VIOLET, True),
         ]
         self.menu_buttons = []
         for i, (label, target, color, enabled) in enumerate(items):
-            rect = pygame.Rect(500, 235 + i * 62, 280, 44)
+            rect = pygame.Rect(500, 218 + i * 56, 280, 42)
             self.draw_menu_button(rect, label, color, enabled)
             self.menu_buttons.append((rect, target, enabled))
+        draw_text(self.screen, AUTHOR_LINE, self.font_sm, MUTED, (510, 565))
         pygame.display.flip()
 
     def draw_tutorial(self):
@@ -874,17 +1149,97 @@ class Game:
         self.draw_background()
         draw_text(self.screen, "生化图鉴", self.font_title, TEXT, (48, 38))
         draw_text(self.screen, "已完成关卡相关卡片会以绿色标记。", self.font_sm, MUTED, (52, 86))
+        clip = self.screen.get_clip()
+        self.screen.set_clip(pygame.Rect(40, 115, 1180, 520))
         for i, card in enumerate(ENCYCLOPEDIA):
             col = i % 2
             row = i // 2
-            rect = pygame.Rect(54 + col * 600, 125 + row * 105, 560, 88)
-            highlighted = card["level"] in self.completed_levels
+            rect = pygame.Rect(54 + col * 600, 125 + row * 105 - self.encyclopedia_scroll, 560, 88)
+            if rect.bottom < 115 or rect.top > 640:
+                continue
+            highlighted = card["level"] in self.completed_levels or (card["level"] == "challenge" and self.challenge_completed)
             self.draw_panel(rect, GREEN if highlighted else VIOLET)
             draw_text(self.screen, f"{card['name']}：{card['title']}", self.font_sm, GREEN if highlighted else CYAN, (rect.x + 14, rect.y + 10))
             draw_wrapped(self.screen, card["explain"] + " " + card["role"], self.font_xs, TEXT, pygame.Rect(rect.x + 14, rect.y + 34, 520, 24), 1)
             draw_text(self.screen, "思想：" + card["idea"], self.font_xs, MUTED, (rect.x + 14, rect.y + 63))
+        self.screen.set_clip(clip)
         self.encyclopedia_back = pygame.Rect(1050, 650, 150, 42)
         self.draw_menu_button(self.encyclopedia_back, "返回", CYAN)
+        pygame.display.flip()
+
+    def draw_about(self):
+        self.draw_background()
+        box = pygame.Rect(210, 105, 860, 510)
+        self.draw_panel(box, CYAN)
+        draw_text(self.screen, "关于《代谢之城 Cell City》", self.font_title, TEXT, (270, 155))
+        body = "《代谢之城 Cell City》是一款基于代谢生物化学知识设计的策略调控小游戏。玩家扮演细胞代谢调度官，在饭后、缺氧、饥饿、氧化应激、高蛋白饮食和随机挑战中，通过调控糖酵解、TCA、呼吸链、PPP、糖原代谢、脂肪动员、β-氧化、糖异生和尿素循环，维持细胞稳态。"
+        draw_wrapped(self.screen, body, self.font_md, TEXT, pygame.Rect(270, 230, 740, 150), 8)
+        draw_text(self.screen, "作者信息", self.font_md, CYAN, (270, 410))
+        draw_text(self.screen, f"作者：{AUTHOR_NAME}", self.font_md, TEXT, (270, 445))
+        draw_text(self.screen, f"学号：{AUTHOR_ID}", self.font_md, TEXT, (270, 475))
+        draw_text(self.screen, "作品思想：代谢不是单一路径的最大化，而是在变化环境中维持动态平衡。", self.font_sm, AMBER, (270, 520))
+        self.about_menu_rect = pygame.Rect(430, 560, 150, 42)
+        self.about_title_rect = pygame.Rect(700, 560, 150, 42)
+        self.draw_menu_button(self.about_menu_rect, "返回主菜单", CYAN)
+        self.draw_menu_button(self.about_title_rect, "返回标题", VIOLET)
+        pygame.display.flip()
+
+    def draw_challenge_setup(self):
+        self.draw_background()
+        draw_text(self.screen, "挑战模式：扰动中的稳态", self.font_title, TEXT, (52, 42))
+        desc = "在挑战模式中，初始状态、环境扰动和危机事件将更加不可预测。你需要在有限回合内维持 ATP、血糖、氧化还原状态和氨毒性安全。"
+        draw_wrapped(self.screen, desc, self.font_sm, MUTED, pygame.Rect(56, 92, 1120, 44), 4)
+        self.challenge_theme_rects = []
+        for i, theme in enumerate(CHALLENGE_THEMES):
+            rect = pygame.Rect(70 + (i % 3) * 390, 160 + (i // 3) * 190, 350, 150)
+            self.challenge_theme_rects.append(rect)
+            active = i == self.challenge_theme_index
+            self.draw_panel(rect, CYAN if active else VIOLET)
+            draw_text(self.screen, theme["name"], self.font_md, TEXT, (rect.x + 18, rect.y + 18))
+            draw_wrapped(self.screen, theme["desc"], self.font_sm, MUTED, pygame.Rect(rect.x + 18, rect.y + 55, 310, 38), 3)
+            draw_text(self.screen, "难度：" + "★" * theme["stars"] + "☆" * (5 - theme["stars"]), self.font_sm, AMBER, (rect.x + 18, rect.y + 108))
+            if active:
+                draw_text(self.screen, "已选择", self.font_sm, GREEN, (rect.x + 265, rect.y + 108))
+        self.challenge_start_rect = pygame.Rect(360, 625, 150, 42)
+        self.challenge_random_rect = pygame.Rect(565, 625, 150, 42)
+        self.challenge_back_rect = pygame.Rect(770, 625, 150, 42)
+        self.draw_menu_button(self.challenge_start_rect, "开始挑战", CYAN)
+        self.draw_menu_button(self.challenge_random_rect, "随机挑战", VIOLET)
+        self.draw_menu_button(self.challenge_back_rect, "返回主菜单", VIOLET)
+        pygame.display.flip()
+
+    def draw_challenge_result(self):
+        self.draw_background()
+        box = pygame.Rect(145, 80, 990, 560)
+        draw_soft_glow(self.screen, box, CYAN, strength=34, radius=16)
+        rounded_rect(self.screen, box, (8, 13, 32), 16, CYAN, 2)
+        score = self.challenge_score()
+        grade = self.challenge_grade(score)
+        completed = self.survived_turns >= 12 and self.state["CellHealth"] > 0
+        draw_text(self.screen, f"挑战结算：{self.challenge_theme['name']}", self.font_title, TEXT, (205, 120))
+        draw_text(self.screen, f"等级 {grade}  分数 {score}", self.font_lg, CYAN, (830, 128))
+        lines = [
+            f"是否完成 12 回合：{'是' if completed else '否'}",
+            f"存活回合数：{self.survived_turns}/12",
+            f"最终 CellHealth：{self.state['CellHealth']}",
+            f"ATP / Glucose / ROS / NH3：{self.state['ATP']} / {self.state['Glucose']} / {self.state['ROS']} / {self.state['NH3']}",
+            f"最高 stable_streak：{self.max_stable_streak}",
+            f"最高风险等级：{self.max_risk_level}",
+            f"Seed：{self.challenge_seed}",
+        ]
+        y = 205
+        for line in lines:
+            draw_text(self.screen, line, self.font_md, TEXT, (220, y))
+            y += 42
+        draw_wrapped(self.screen, self.challenge_feedback(), self.font_md, AMBER, pygame.Rect(700, 230, 360, 120), 8)
+        self.challenge_again_rect = pygame.Rect(220, 552, 130, 42)
+        self.challenge_setup_rect = pygame.Rect(390, 552, 170, 42)
+        self.challenge_menu_rect = pygame.Rect(600, 552, 150, 42)
+        self.challenge_book_rect = pygame.Rect(790, 552, 150, 42)
+        self.draw_menu_button(self.challenge_again_rect, "再来一局", CYAN)
+        self.draw_menu_button(self.challenge_setup_rect, "返回挑战设置", VIOLET)
+        self.draw_menu_button(self.challenge_menu_rect, "返回主菜单", VIOLET)
+        self.draw_menu_button(self.challenge_book_rect, "查看图鉴", VIOLET)
         pygame.display.flip()
 
     def draw_top(self):
@@ -892,6 +1247,14 @@ class Game:
         self.draw_panel(rect, CYAN)
         draw_text(self.screen, "代谢之城 Cell City", self.font_title, TEXT, (38, 24))
         draw_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_sm, MUTED, (42, 66))
+        if self.is_challenge:
+            draw_text(self.screen, f"挑战：{self.challenge_theme['name']}  Seed: {self.challenge_seed}", self.font_md, CYAN, (545, 26))
+            draw_text(self.screen, f"回合 {self.turn}/12  稳态连击 {self.stable_streak}", self.font_md, VIOLET, (545, 58))
+            label, color = self.risk_label()
+            if self.risk_level() >= 3 and int(self.time * 4) % 2 == 0:
+                color = RED
+            draw_text(self.screen, f"风险等级：{label}", self.font_md, color, (880, 58))
+            return
         draw_text(self.screen, f"关卡 {self.level_index + 1}/5：{self.level['name']}", self.font_md, CYAN, (545, 26))
         draw_text(self.screen, f"回合 {self.turn}/10", self.font_md, VIOLET, (545, 58))
         goal_texts = []
@@ -951,13 +1314,14 @@ class Game:
                 draw_soft_glow(self.screen, node_rect.inflate(8 + int(pulse * 8), 8 + int(pulse * 8)), CYAN, strength=16, radius=9)
             rounded_rect(self.screen, node_rect, CYAN_DARK if active else (15, 23, 42), 7, CYAN if active else (71, 85, 105), 1)
             self.screen.blit(label, (node_rect.centerx - label.get_width() // 2, node_rect.centery - label.get_height() // 2))
-        draw_wrapped(self.screen, self.level["context"], self.font_sm, MUTED, pygame.Rect(306, 486, 515, 42))
+        context = self.challenge_theme["desc"] if self.is_challenge else self.level["context"]
+        draw_wrapped(self.screen, context, self.font_sm, MUTED, pygame.Rect(306, 486, 515, 42))
 
     def card_rects(self):
         rects = []
         x0, y0 = 874, 154 - self.card_scroll
         card_w, card_h = 176, 88
-        for i, card in enumerate(CARDS):
+        for i, card in enumerate(self.current_deck()):
             col = i % 2
             row = i // 2
             rects.append(pygame.Rect(x0 + col * 188, y0 + row * 98, card_w, card_h))
@@ -969,27 +1333,34 @@ class Game:
         draw_text(self.screen, f"行动卡牌  已选 {len(self.selected)}/2", self.font_md, VIOLET, (882, 128))
         clip = self.screen.get_clip()
         self.screen.set_clip(pygame.Rect(872, 150, 380, 335))
+        deck = self.current_deck()
         for i, rect in enumerate(self.card_rects()):
             if rect.bottom < 150 or rect.top > 492:
                 continue
-            card = CARDS[i]
+            card = deck[i]
             selected = i in self.selected
+            special = self.is_challenge and i >= len(CARDS)
             anim = self.card_anim[i]
             lift = int(anim["hover"] * 5)
             scale = 1.0 + anim["select"] * 0.035 + anim["flash"] * 0.035
             draw_rect = inflate_center(rect.move(0, -lift), scale)
             glow_power = max(anim["hover"], anim["select"], anim["flash"])
             if glow_power > 0.05:
-                draw_soft_glow(self.screen, draw_rect, CYAN if selected else VIOLET, strength=int(18 + glow_power * 18), radius=10)
+                glow_color = (251, 113, 133) if special else CYAN if selected else VIOLET
+                draw_soft_glow(self.screen, draw_rect, glow_color, strength=int(18 + glow_power * 18), radius=10)
             color = mix(PANEL_2, (21, 44, 73), max(anim["select"], anim["flash"] * 0.7))
-            border = mix((71, 85, 105), CYAN if selected else VIOLET, max(anim["hover"], anim["select"], anim["flash"]))
+            border_target = (251, 113, 133) if special else CYAN if selected else VIOLET
+            border = mix((71, 85, 105), border_target, max(anim["hover"], anim["select"], anim["flash"]))
             rounded_rect(self.screen, draw_rect, color, 10, border, 2 if selected or anim["flash"] > 0.1 else 1)
             draw_text(self.screen, card["name"], self.font_sm, TEXT, (draw_rect.x + 10, draw_rect.y + 8))
             draw_text(self.screen, card["pathway"], self.font_xs, VIOLET, (draw_rect.x + 10, draw_rect.y + 31))
+            if special and anim["hover"] > 0.2:
+                draw_text(self.screen, "高风险高收益", self.font_xs, AMBER, (draw_rect.x + 88, draw_rect.y + 8))
             effect = self.modified_effect(card)
             draw_wrapped(self.screen, effect_to_text(effect), self.font_xs, CYAN, pygame.Rect(draw_rect.x + 10, draw_rect.y + 54, draw_rect.w - 18, 28), 0)
         self.screen.set_clip(clip)
-        draw_wrapped(self.screen, self.level["strategy"], self.font_sm, MUTED, pygame.Rect(882, 492, 345, 38))
+        strategy = "挑战模式：在随机扰动中维持 ATP、血糖、ROS 与 NH3 安全。" if self.is_challenge else self.level["strategy"]
+        draw_wrapped(self.screen, strategy, self.font_sm, MUTED, pygame.Rect(882, 492, 345, 38))
 
     def draw_button(self, rect, text, enabled=True, accent=CYAN):
         mouse = pygame.mouse.get_pos()
@@ -1044,8 +1415,8 @@ class Game:
         self.next_rect = pygame.Rect(1110, 690, 112, 30)
         can_execute = len(self.selected) == 2 and self.screen_state == SCREEN_GAME and not self.input_locked
         self.draw_button(self.execute_rect, "执行本回合", can_execute, CYAN)
-        self.draw_button(self.next_rect, "下一关", not self.input_locked, VIOLET)
-        if self.level.get("modifier"):
+        self.draw_button(self.next_rect, "结束挑战" if self.is_challenge else "下一关", not self.input_locked, VIOLET)
+        if (not self.is_challenge) and self.level.get("modifier"):
             draw_wrapped(self.screen, self.level["modifier"]["note"], self.font_xs, AMBER, pygame.Rect(36, 682, 880, 20), 1)
         if self.event_popup:
             alpha = max(0.0, 1.0 - self.event_popup["age"] / 2.4)
@@ -1053,6 +1424,15 @@ class Game:
             draw_soft_glow(self.screen, popup, AMBER, strength=22, radius=10)
             rounded_rect(self.screen, popup, (58, 41, 15), 10, AMBER, 1)
             draw_wrapped(self.screen, self.event_popup["text"], self.font_sm, mix(AMBER, TEXT, alpha * 0.5), pygame.Rect(370, 526, 540, 18), 1)
+        if self.challenge_event_alert:
+            crisis = self.challenge_event_alert["crisis"]
+            color = RED if crisis else CYAN
+            if crisis and int(self.time * 8) % 2 == 0:
+                color = AMBER
+            alert = pygame.Rect(310, 505, 660, 54)
+            draw_soft_glow(self.screen, alert, color, strength=28, radius=12)
+            rounded_rect(self.screen, alert, (37, 20, 31) if crisis else (11, 36, 54), 12, color, 2)
+            draw_wrapped(self.screen, self.challenge_event_alert["text"], self.font_sm, TEXT, pygame.Rect(330, 516, 620, 26), 2)
 
     def draw_result(self):
         self.draw_background()
@@ -1105,11 +1485,14 @@ class Game:
             r = pygame.Rect(x, y, 180, 46)
             rounded_rect(self.screen, r, (24, 38, 80), 10, CYAN if i % 2 == 0 else VIOLET, 1)
             draw_text(self.screen, item, self.font_md, TEXT, (x + 48, y + 11))
-        self.final_title_rect = pygame.Rect(370, 545, 140, 42)
-        self.final_book_rect = pygame.Rect(565, 545, 140, 42)
-        self.final_restart_rect = pygame.Rect(760, 545, 140, 42)
+        draw_text(self.screen, f"课程大作业作品｜{AUTHOR_NAME} {AUTHOR_ID}", self.font_sm, MUTED, (490, 515))
+        self.final_title_rect = pygame.Rect(300, 545, 130, 42)
+        self.final_book_rect = pygame.Rect(470, 545, 130, 42)
+        self.final_about_rect = pygame.Rect(640, 545, 130, 42)
+        self.final_restart_rect = pygame.Rect(810, 545, 130, 42)
         self.draw_button(self.final_title_rect, "返回标题", True, VIOLET)
         self.draw_button(self.final_book_rect, "查看图鉴", True, VIOLET)
+        self.draw_button(self.final_about_rect, "关于作品", True, VIOLET)
         self.draw_button(self.final_restart_rect, "重新开始", True, CYAN)
         pygame.display.flip()
 
@@ -1129,8 +1512,17 @@ class Game:
         if self.screen_state == SCREEN_ENCYCLOPEDIA:
             self.draw_encyclopedia()
             return
+        if self.screen_state == SCREEN_ABOUT:
+            self.draw_about()
+            return
+        if self.screen_state == SCREEN_CHALLENGE_SETUP:
+            self.draw_challenge_setup()
+            return
         if self.screen_state == SCREEN_RESULT:
             self.draw_result()
+            return
+        if self.screen_state == SCREEN_CHALLENGE_RESULT:
+            self.draw_challenge_result()
             return
         if self.screen_state == SCREEN_FINAL_SUMMARY:
             self.draw_final()
@@ -1155,14 +1547,21 @@ class Game:
                         sys.exit()
                     if target == SCREEN_ENCYCLOPEDIA:
                         self.encyclopedia_return = SCREEN_TITLE
+                    if target == SCREEN_ABOUT:
+                        self.about_return = SCREEN_TITLE
                     self.screen_state = target
 
     def handle_main_menu_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             for rect, target, enabled in getattr(self, "menu_buttons", []):
                 if enabled and rect.collidepoint(event.pos):
+                    if target == "QUIT":
+                        pygame.quit()
+                        sys.exit()
                     if target == SCREEN_ENCYCLOPEDIA:
                         self.encyclopedia_return = SCREEN_MAIN_MENU
+                    if target == SCREEN_ABOUT:
+                        self.about_return = SCREEN_MAIN_MENU
                     self.screen_state = target
 
     def handle_tutorial_event(self, event):
@@ -1195,8 +1594,44 @@ class Game:
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.encyclopedia_back.collidepoint(event.pos):
                 self.screen_state = self.encyclopedia_return
+        if event.type == pygame.MOUSEWHEEL:
+            self.encyclopedia_scroll = max(0, min(230, self.encyclopedia_scroll - event.y * 36))
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.screen_state = self.encyclopedia_return
+
+    def handle_about_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.about_menu_rect.collidepoint(event.pos):
+                self.screen_state = SCREEN_MAIN_MENU
+            elif self.about_title_rect.collidepoint(event.pos):
+                self.screen_state = SCREEN_TITLE
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.screen_state = self.about_return
+
+    def handle_challenge_setup_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            for i, rect in enumerate(getattr(self, "challenge_theme_rects", [])):
+                if rect.collidepoint(event.pos):
+                    self.challenge_theme_index = i
+                    return
+            if self.challenge_start_rect.collidepoint(event.pos):
+                self.start_challenge(self.challenge_theme_index)
+            elif self.challenge_random_rect.collidepoint(event.pos):
+                self.start_challenge(None)
+            elif self.challenge_back_rect.collidepoint(event.pos):
+                self.screen_state = SCREEN_MAIN_MENU
+
+    def handle_challenge_result_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.challenge_again_rect.collidepoint(event.pos):
+                self.start_challenge(self.challenge_theme_index)
+            elif self.challenge_setup_rect.collidepoint(event.pos):
+                self.screen_state = SCREEN_CHALLENGE_SETUP
+            elif self.challenge_menu_rect.collidepoint(event.pos):
+                self.screen_state = SCREEN_MAIN_MENU
+            elif self.challenge_book_rect.collidepoint(event.pos):
+                self.encyclopedia_return = SCREEN_CHALLENGE_RESULT
+                self.screen_state = SCREEN_ENCYCLOPEDIA
 
     def handle_result_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
@@ -1223,6 +1658,9 @@ class Game:
             elif self.final_book_rect.collidepoint(event.pos):
                 self.encyclopedia_return = SCREEN_FINAL_SUMMARY
                 self.screen_state = SCREEN_ENCYCLOPEDIA
+            elif self.final_about_rect.collidepoint(event.pos):
+                self.about_return = SCREEN_FINAL_SUMMARY
+                self.screen_state = SCREEN_ABOUT
             elif self.final_restart_rect.collidepoint(event.pos):
                 self.completed_levels.clear()
                 self.start_level(0)
@@ -1234,6 +1672,10 @@ class Game:
             self.execute_turn()
             return
         if self.next_rect.collidepoint(pos):
+            if self.is_challenge:
+                self.survived_turns = self.turn
+                self.screen_state = SCREEN_CHALLENGE_RESULT
+                return
             if self.level_index < len(LEVELS) - 1:
                 self.level_index += 1
                 self.reset_level()
@@ -1254,11 +1696,17 @@ class Game:
 
     def handle_game_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.challenge_event_alert:
+                self.challenge_event_alert = None
+                return
             self.handle_game_click(event.pos)
         if event.type == pygame.MOUSEWHEEL:
             self.handle_wheel(event.y)
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-            self.execute_turn()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE and self.challenge_event_alert:
+                self.challenge_event_alert = None
+            elif event.key == pygame.K_RETURN:
+                self.execute_turn()
 
     def handle_event(self, event):
         if event.type == pygame.QUIT:
@@ -1266,9 +1714,21 @@ class Game:
             sys.exit()
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             if self.screen_state == SCREEN_GAME:
+                self.screen_state = SCREEN_CHALLENGE_SETUP if self.is_challenge else SCREEN_SCENARIO_SELECT
+                return
+            if self.screen_state == SCREEN_ABOUT:
+                self.screen_state = self.about_return
+                return
+            if self.screen_state == SCREEN_ENCYCLOPEDIA:
+                self.screen_state = self.encyclopedia_return
+                return
+            if self.screen_state == SCREEN_CHALLENGE_RESULT:
+                self.screen_state = SCREEN_CHALLENGE_SETUP
+                return
+            if self.screen_state == SCREEN_RESULT:
                 self.screen_state = SCREEN_SCENARIO_SELECT
                 return
-            if self.screen_state in (SCREEN_MAIN_MENU, SCREEN_TUTORIAL, SCREEN_SCENARIO_SELECT, SCREEN_ENCYCLOPEDIA):
+            if self.screen_state in (SCREEN_MAIN_MENU, SCREEN_TUTORIAL, SCREEN_SCENARIO_SELECT, SCREEN_CHALLENGE_SETUP):
                 self.screen_state = SCREEN_TITLE
                 return
         handlers = {
@@ -1279,6 +1739,9 @@ class Game:
             SCREEN_GAME: self.handle_game_event,
             SCREEN_RESULT: self.handle_result_event,
             SCREEN_ENCYCLOPEDIA: self.handle_encyclopedia_event,
+            SCREEN_ABOUT: self.handle_about_event,
+            SCREEN_CHALLENGE_SETUP: self.handle_challenge_setup_event,
+            SCREEN_CHALLENGE_RESULT: self.handle_challenge_result_event,
             SCREEN_FINAL_SUMMARY: self.handle_final_event,
         }
         handlers.get(self.screen_state, self.handle_game_event)(event)

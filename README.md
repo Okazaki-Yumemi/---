@@ -31,6 +31,11 @@ python -m PyInstaller --onefile --windowed --name "代谢之城 Cell City" main.
 - `requirements.txt`：pygame 与 PyInstaller 依赖。
 - `build_exe.bat`：一键打包脚本。
 
+## 作者信息
+
+作者：刘培锐  
+学号：525714910036
+
 ## 界面流程
 
 - `TITLE`：开始界面。
@@ -41,6 +46,9 @@ python -m PyInstaller --onefile --windowed --name "代谢之城 Cell City" main.
 - `RESULT`：关卡结算。
 - `ENCYCLOPEDIA`：生化图鉴。
 - `FINAL_SUMMARY`：最终总结。
+- `ABOUT`：关于作品与作者信息。
+- `CHALLENGE_SETUP`：挑战模式设置。
+- `CHALLENGE_RESULT`：挑战模式结算。
 
 ## 动效参数
 
