@@ -30,3 +30,13 @@ python -m PyInstaller --onefile --windowed --name "代谢之城 Cell City" main.
 - `main.py`：完整 pygame 游戏代码，包含关卡、卡牌、状态、地图、交互和结算。
 - `requirements.txt`：pygame 与 PyInstaller 依赖。
 - `build_exe.bat`：一键打包脚本。
+
+## 动效参数
+
+主要动效集中在 `main.py` 的 `Game` 类顶部：
+
+- `STATUS_SMOOTH_SPEED`：状态条数值平滑逼近速度。
+- `CARD_ANIM_SPEED`：卡牌 hover、选中、点击反馈的过渡速度。
+- `LOG_FADE_SPEED`：事件日志淡入速度。
+- `PATH_DURATION`：代谢地图路径高亮和粒子动画持续时间。
+- `INPUT_LOCK_SECONDS`：执行回合后的临时输入锁定时间。

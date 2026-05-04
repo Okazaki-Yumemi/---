@@ -364,11 +364,52 @@ def effect_to_text(effect):
         parts.append(f"{key} {sign}{value}")
     return "  ".join(parts)
 
+def lerp(a, b, t):
+    return a + (b - a) * max(0.0, min(1.0, t))
+
+
+def approach(current, target, speed, dt):
+    return lerp(current, target, 1 - math.exp(-speed * dt))
+
+
+def mix(c1, c2, t):
+    t = max(0.0, min(1.0, t))
+    return tuple(int(c1[i] + (c2[i] - c1[i]) * t) for i in range(3))
+
+
+def inflate_center(rect, scale):
+    w = int(rect.width * scale)
+    h = int(rect.height * scale)
+    return pygame.Rect(rect.centerx - w // 2, rect.centery - h // 2, w, h)
+
+
+def draw_soft_glow(surface, rect, color, strength=28, radius=12):
+    glow = pygame.Surface((rect.width + strength * 2, rect.height + strength * 2), pygame.SRCALPHA)
+    for i in range(strength, 0, -7):
+        alpha = int(9 * (i / strength) ** 1.7)
+        pygame.draw.rect(
+            glow,
+            (*color, alpha),
+            pygame.Rect(strength - i, strength - i, rect.width + i * 2, rect.height + i * 2),
+            border_radius=radius + i,
+        )
+    surface.blit(glow, (rect.x - strength, rect.y - strength))
+
+
+def edge_progress_point(start, end, progress):
+    return (start[0] + (end[0] - start[0]) * progress, start[1] + (end[1] - start[1]) * progress)
+
 
 class Game:
+    STATUS_SMOOTH_SPEED = 6.0
+    CARD_ANIM_SPEED = 13.0
+    LOG_FADE_SPEED = 10.0
+    PATH_DURATION = 1.35
+    INPUT_LOCK_SECONDS = 1.65
+
     def __init__(self):
         pygame.init()
-        pygame.display.set_caption("代谢之城 Cell City")
+        pygame.display.set_caption("???? Cell City")
         self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
         self.clock = pygame.time.Clock()
         self.font_xs = load_font(14)
@@ -379,6 +420,18 @@ class Game:
         self.level_index = 0
         self.card_scroll = 0
         self.mode = "playing"
+        self.time = 0.0
+        self.display_state = {}
+        self.card_anim = [{"hover": 0.0, "select": 0.0, "flash": 0.0} for _ in CARDS]
+        self.log_items = []
+        self.input_locked = False
+        self.input_lock_timer = 0.0
+        self.path_timer = 0.0
+        self.path_duration = self.PATH_DURATION
+        self.active_edges = []
+        self.pending_result = False
+        self.execute_rect = pygame.Rect(960, 610, 132, 42)
+        self.next_rect = pygame.Rect(1110, 610, 112, 42)
         self.reset_level()
 
     @property
@@ -387,11 +440,22 @@ class Game:
 
     def reset_level(self):
         self.state = deepcopy(LEVELS[self.level_index]["initial"])
+        self.display_state = {key: float(value) for key, value in self.state.items()}
         self.turn = 0
         self.selected = []
         self.active_nodes = []
-        self.logs = [f"进入「{LEVELS[self.level_index]['name']}」。选择 2 张行动卡，调度代谢通量。"]
+        self.active_edges = []
+        self.path_timer = 0.0
+        self.pending_result = False
+        self.input_locked = False
+        self.input_lock_timer = 0.0
+        self.log_items = []
+        self.add_log(f"???{LEVELS[self.level_index]['name']}???? 2 ????????????")
         self.mode = "playing"
+
+    def add_log(self, text):
+        self.log_items.insert(0, {"text": text, "age": 0.0, "y": -18.0, "alpha": 0.0})
+        self.log_items = self.log_items[:6]
 
     def modified_effect(self, card):
         effect = deepcopy(card["effect"])
@@ -422,24 +486,35 @@ class Game:
             s[key] = clamp(s[key])
 
     def execute_turn(self):
-        if self.mode != "playing" or len(self.selected) != 2:
+        if self.mode != "playing" or self.input_locked or len(self.selected) != 2:
             return
         chosen = [CARDS[i] for i in self.selected]
         explanations = []
         active = set()
+        edges = []
+        old_selected = list(self.selected)
         for card in chosen:
             effect = self.modified_effect(card)
             for key, delta in effect.items():
                 self.state[key] = clamp(self.state[key] + delta)
-            explanations.append(f"{card['name']}：{card['explain']}")
+            explanations.append(f"{card['name']}?{card['explain']}")
             active.update(card["nodes"])
+            for a, b in zip(card["nodes"], card["nodes"][1:]):
+                if a in MAP_NODES and b in MAP_NODES:
+                    edges.append((a, b))
         self.apply_homeostatic_pressure()
         self.turn += 1
         self.active_nodes = list(active)
-        self.logs.insert(0, f"第 {self.turn} 回合：" + "  ".join(explanations))
+        self.active_edges = edges
+        self.path_timer = self.path_duration
+        self.input_locked = True
+        self.input_lock_timer = self.INPUT_LOCK_SECONDS
+        self.add_log(f"? {self.turn} ???" + "  ".join(explanations))
+        for index in old_selected:
+            self.card_anim[index]["flash"] = 1.0
         self.selected = []
         if self.turn >= 10 or self.state["CellHealth"] <= 0:
-            self.mode = "result"
+            self.pending_result = True
 
     def goal_met(self, goal):
         key, op, value = goal
@@ -455,25 +530,62 @@ class Game:
         ]
         score = sum(20 for ok in checks if ok)
         passed = all(self.goal_met(goal) for goal in self.level["goals"])
-        maxim = "稳态来自调度，而不是单一路径的极限输出。"
+        maxim = "????????????????????"
         if self.state["ROS"] > 65:
-            maxim = "高能通量必须配套还原力，否则效率会转化为损伤。"
+            maxim = "???????????????????????"
         if self.state["NH3"] > 60:
-            maxim = "碳骨架可以被利用，氮毒性必须被付费清除。"
+            maxim = "????????????????????"
         if self.state["Glucose"] < 30:
-            maxim = "缺糖时要逆势而行，但糖异生不能脱离能量账本。"
+            maxim = "??????????????????????"
         if self.state["ATP"] < 40:
-            maxim = "能量不足时，优先抓住最短的供能路径。"
+            maxim = "??????????????????"
         if passed and score >= 80:
-            maxim = "能量、物质、还原力和毒性被纳入同一张动态账本。"
+            maxim = "???????????????????????"
         return score, passed, maxim
+
+    def update(self, dt):
+        self.time += dt
+        mouse = pygame.mouse.get_pos()
+        for key in STATE_KEYS:
+            self.display_state[key] = approach(self.display_state[key], self.state[key], self.STATUS_SMOOTH_SPEED, dt)
+        for i, rect in enumerate(self.card_rects()):
+            hovered = rect.collidepoint(mouse) and 150 <= mouse[1] <= 492 and self.mode == "playing" and not self.input_locked
+            self.card_anim[i]["hover"] = approach(self.card_anim[i]["hover"], 1.0 if hovered else 0.0, self.CARD_ANIM_SPEED, dt)
+            self.card_anim[i]["select"] = approach(self.card_anim[i]["select"], 1.0 if i in self.selected else 0.0, self.CARD_ANIM_SPEED, dt)
+            self.card_anim[i]["flash"] = max(0.0, self.card_anim[i]["flash"] - dt * 2.5)
+        for item in self.log_items:
+            item["age"] += dt
+            item["y"] = approach(item["y"], 0.0, 12.0, dt)
+            item["alpha"] = approach(item["alpha"], 255.0, self.LOG_FADE_SPEED, dt)
+        if self.path_timer > 0:
+            self.path_timer = max(0.0, self.path_timer - dt)
+        elif self.active_edges and not self.input_locked:
+            self.active_edges = []
+            self.active_nodes = []
+        if self.input_locked:
+            self.input_lock_timer = max(0.0, self.input_lock_timer - dt)
+            if self.input_lock_timer <= 0:
+                self.input_locked = False
+                if self.pending_result:
+                    self.pending_result = False
+                    self.mode = "result"
+
+    def draw_panel(self, rect, accent=CYAN):
+        pulse = 0.45 + 0.25 * math.sin(self.time * 1.6)
+        draw_soft_glow(self.screen, rect, accent, strength=18, radius=12)
+        rounded_rect(self.screen, rect, PANEL, 12, mix((45, 78, 120), accent, pulse * 0.22), 1)
 
     def draw_background(self):
         self.screen.fill(BG)
+        grid_color = (10, 22, 45)
+        for x in range(0, WIDTH, 42):
+            pygame.draw.line(self.screen, grid_color, (x, 0), (x, HEIGHT), 1)
+        for y in range(0, HEIGHT, 42):
+            pygame.draw.line(self.screen, grid_color, (0, y), (WIDTH, y), 1)
         for radius, alpha, center, color in [
-            (250, 55, (220, 80), CYAN),
-            (300, 44, (1010, 90), VIOLET),
-            (180, 28, (690, 430), CYAN),
+            (250, 38, (220 + math.sin(self.time * 0.35) * 18, 80), CYAN),
+            (300, 30, (1010, 90 + math.cos(self.time * 0.28) * 20), VIOLET),
+            (180, 20, (690 + math.sin(self.time * 0.42) * 16, 430), CYAN),
         ]:
             glow = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
             for r in range(radius, 0, -8):
@@ -483,48 +595,66 @@ class Game:
 
     def draw_top(self):
         rect = pygame.Rect(18, 14, 1244, 82)
-        rounded_rect(self.screen, rect, (8, 13, 32), 12, (34, 211, 238), 1)
-        draw_text(self.screen, "代谢之城 Cell City", self.font_title, TEXT, (38, 24))
+        self.draw_panel(rect, CYAN)
+        draw_text(self.screen, "???? Cell City", self.font_title, TEXT, (38, 24))
         draw_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_sm, MUTED, (42, 66))
-        draw_text(self.screen, f"关卡 {self.level_index + 1}/5：{self.level['name']}", self.font_md, CYAN, (545, 26))
-        draw_text(self.screen, f"回合 {self.turn}/10", self.font_md, VIOLET, (545, 58))
+        draw_text(self.screen, f"?? {self.level_index + 1}/5?{self.level['name']}", self.font_md, CYAN, (545, 26))
+        draw_text(self.screen, f"?? {self.turn}/10", self.font_md, VIOLET, (545, 58))
         goal_texts = []
         for key, op, value in self.level["goals"]:
-            mark = "✓" if self.goal_met((key, op, value)) else "○"
+            mark = "?" if self.goal_met((key, op, value)) else "?"
             goal_texts.append(f"{mark} {key} {op} {value}")
-        draw_wrapped(self.screen, "目标：" + "；".join(goal_texts), self.font_sm, TEXT, pygame.Rect(760, 25, 470, 50), 3)
+        draw_wrapped(self.screen, "???" + "?".join(goal_texts), self.font_sm, TEXT, pygame.Rect(760, 25, 470, 50), 3)
 
     def draw_status(self):
         rect = pygame.Rect(18, 112, 250, 430)
-        rounded_rect(self.screen, rect, PANEL, 12, (45, 78, 120), 1)
-        draw_text(self.screen, "状态条", self.font_md, CYAN, (36, 128))
+        self.draw_panel(rect, CYAN)
+        draw_text(self.screen, "???", self.font_md, CYAN, (36, 128))
         y = 166
         for key in STATE_KEYS:
-            value = self.state[key]
+            value = self.display_state[key]
+            target_value = self.state[key]
             color = CYAN
+            danger = False
             if key in ("ROS", "NH3"):
-                color = RED if value >= 70 else AMBER if value >= 45 else GREEN
+                danger = target_value >= 70
+                color = RED if target_value >= 70 else AMBER if target_value >= 45 else GREEN
             if key == "CellHealth":
-                color = RED if value < 40 else AMBER if value < 70 else GREEN
+                danger = target_value < 40
+                color = RED if target_value < 40 else AMBER if target_value < 70 else GREEN
             draw_text(self.screen, STATE_LABELS[key], self.font_xs, TEXT, (36, y))
-            draw_text(self.screen, str(value), self.font_xs, color, (225, y))
-            bar = pygame.Rect(36, y + 22, 198, 9)
-            pygame.draw.rect(self.screen, (30, 41, 73), bar, border_radius=5)
-            pygame.draw.rect(self.screen, color, (bar.x, bar.y, int(bar.width * value / 100), bar.height), border_radius=5)
+            draw_text(self.screen, str(int(round(value))), self.font_xs, color, (225, y))
+            bar = pygame.Rect(36, y + 22, 198, 11)
+            if danger:
+                draw_soft_glow(self.screen, bar.inflate(8, 8), RED, strength=12, radius=7)
+            pygame.draw.rect(self.screen, (22, 31, 58), bar, border_radius=6)
+            fill_rect = pygame.Rect(bar.x, bar.y, int(bar.width * value / 100), bar.height)
+            pygame.draw.rect(self.screen, color, fill_rect, border_radius=6)
+            shine = pygame.Rect(fill_rect.x + 2, fill_rect.y + 2, max(0, fill_rect.width - 4), 3)
+            pygame.draw.rect(self.screen, mix(color, WHITE, 0.45), shine, border_radius=3)
             y += 37
 
     def draw_map(self):
         rect = pygame.Rect(288, 112, 560, 430)
-        rounded_rect(self.screen, rect, PANEL, 12, (45, 78, 120), 1)
-        draw_text(self.screen, "代谢地图", self.font_md, CYAN, (306, 128))
+        self.draw_panel(rect, CYAN)
+        draw_text(self.screen, "????", self.font_md, CYAN, (306, 128))
+        path_phase = 1.0 - self.path_timer / self.path_duration if self.path_duration else 1.0
         for start, end in MAP_EDGES:
-            active = start in self.active_nodes and end in self.active_nodes
+            active = (start, end) in self.active_edges or (end, start) in self.active_edges
             draw_arrow(self.screen, MAP_NODES[start], MAP_NODES[end], CYAN if active else (68, 84, 116), 3 if active else 1)
+            if active and self.path_timer > 0:
+                for offset in (0.0, 0.33, 0.66):
+                    p = (path_phase + offset) % 1.0
+                    dot = edge_progress_point(MAP_NODES[start], MAP_NODES[end], p)
+                    pygame.draw.circle(self.screen, (190, 245, 255), (int(dot[0]), int(dot[1])), 4)
         for name, pos in MAP_NODES.items():
             active = name in self.active_nodes
             label = self.font_xs.render(name, True, TEXT if active else (202, 213, 226))
             w = max(52, label.get_width() + 14)
             node_rect = pygame.Rect(pos[0] - w // 2, pos[1] - 13, w, 26)
+            if active:
+                pulse = 0.5 + 0.5 * math.sin(self.time * 9.0)
+                draw_soft_glow(self.screen, node_rect.inflate(8 + int(pulse * 8), 8 + int(pulse * 8)), CYAN, strength=16, radius=9)
             rounded_rect(self.screen, node_rect, CYAN_DARK if active else (15, 23, 42), 7, CYAN if active else (71, 85, 105), 1)
             self.screen.blit(label, (node_rect.centerx - label.get_width() // 2, node_rect.centery - label.get_height() // 2))
         draw_wrapped(self.screen, self.level["context"], self.font_sm, MUTED, pygame.Rect(306, 486, 515, 42))
@@ -541,8 +671,8 @@ class Game:
 
     def draw_cards(self):
         area = pygame.Rect(864, 112, 398, 430)
-        rounded_rect(self.screen, area, PANEL, 12, (45, 78, 120), 1)
-        draw_text(self.screen, f"行动卡牌  已选 {len(self.selected)}/2", self.font_md, VIOLET, (882, 128))
+        self.draw_panel(area, VIOLET)
+        draw_text(self.screen, f"????  ?? {len(self.selected)}/2", self.font_md, VIOLET, (882, 128))
         clip = self.screen.get_clip()
         self.screen.set_clip(pygame.Rect(872, 150, 380, 335))
         for i, rect in enumerate(self.card_rects()):
@@ -550,31 +680,59 @@ class Game:
                 continue
             card = CARDS[i]
             selected = i in self.selected
-            color = (21, 44, 73) if selected else PANEL_2
-            border = CYAN if selected else (71, 85, 105)
-            rounded_rect(self.screen, rect, color, 10, border, 2 if selected else 1)
-            draw_text(self.screen, card["name"], self.font_sm, TEXT, (rect.x + 10, rect.y + 8))
-            draw_text(self.screen, card["pathway"], self.font_xs, VIOLET, (rect.x + 10, rect.y + 31))
+            anim = self.card_anim[i]
+            lift = int(anim["hover"] * 5)
+            scale = 1.0 + anim["select"] * 0.035 + anim["flash"] * 0.035
+            draw_rect = inflate_center(rect.move(0, -lift), scale)
+            glow_power = max(anim["hover"], anim["select"], anim["flash"])
+            if glow_power > 0.05:
+                draw_soft_glow(self.screen, draw_rect, CYAN if selected else VIOLET, strength=int(18 + glow_power * 18), radius=10)
+            color = mix(PANEL_2, (21, 44, 73), max(anim["select"], anim["flash"] * 0.7))
+            border = mix((71, 85, 105), CYAN if selected else VIOLET, max(anim["hover"], anim["select"], anim["flash"]))
+            rounded_rect(self.screen, draw_rect, color, 10, border, 2 if selected or anim["flash"] > 0.1 else 1)
+            draw_text(self.screen, card["name"], self.font_sm, TEXT, (draw_rect.x + 10, draw_rect.y + 8))
+            draw_text(self.screen, card["pathway"], self.font_xs, VIOLET, (draw_rect.x + 10, draw_rect.y + 31))
             effect = self.modified_effect(card)
-            draw_wrapped(self.screen, effect_to_text(effect), self.font_xs, CYAN, pygame.Rect(rect.x + 10, rect.y + 54, rect.w - 18, 28), 0)
+            draw_wrapped(self.screen, effect_to_text(effect), self.font_xs, CYAN, pygame.Rect(draw_rect.x + 10, draw_rect.y + 54, draw_rect.w - 18, 28), 0)
         self.screen.set_clip(clip)
         draw_wrapped(self.screen, self.level["strategy"], self.font_sm, MUTED, pygame.Rect(882, 492, 345, 38))
 
+    def draw_button(self, rect, text, enabled=True, accent=CYAN):
+        mouse = pygame.mouse.get_pos()
+        pressed = pygame.mouse.get_pressed()[0] and rect.collidepoint(mouse)
+        hover = rect.collidepoint(mouse) and enabled and not self.input_locked
+        y = -3 if hover else 0
+        scale = 0.97 if pressed and enabled else 1.0
+        draw_rect = inflate_center(rect.move(0, y), scale)
+        base = accent if enabled else (51, 65, 85)
+        if hover:
+            draw_soft_glow(self.screen, draw_rect, accent, strength=18, radius=9)
+            base = mix(base, WHITE, 0.18)
+        rounded_rect(self.screen, draw_rect, base, 9, mix(base, WHITE, 0.25), 1)
+        label_color = BG if enabled and accent == CYAN else TEXT if enabled else MUTED
+        text_surface = self.font_sm.render(text, True, label_color)
+        self.screen.blit(text_surface, (draw_rect.centerx - text_surface.get_width() // 2, draw_rect.centery - text_surface.get_height() // 2))
+
     def draw_log(self):
         rect = pygame.Rect(18, 558, 1244, 144)
-        rounded_rect(self.screen, rect, (8, 13, 32), 12, (45, 78, 120), 1)
-        draw_text(self.screen, "事件日志 / 本回合解释", self.font_md, CYAN, (36, 574))
+        self.draw_panel(rect, CYAN)
+        draw_text(self.screen, "???? / ?????", self.font_md, CYAN, (36, 574))
         y = 608
-        for entry in self.logs[:3]:
-            draw_wrapped(self.screen, entry, self.font_sm, TEXT, pygame.Rect(36, y, 900, 26), 2)
+        for idx, item in enumerate(self.log_items[:3]):
+            alpha = int(max(0, min(255, item["alpha"])))
+            highlight = max(0.0, 1.0 - item["age"] / 1.8) if idx == 0 else 0.0
+            line_rect = pygame.Rect(30, int(y + item["y"]) - 3, 905, 28)
+            if highlight > 0.02:
+                rounded_rect(self.screen, line_rect, mix((15, 23, 42), CYAN_DARK, highlight * 0.5), 7, mix((45, 78, 120), CYAN, highlight), 1)
+            temp = pygame.Surface((910, 32), pygame.SRCALPHA)
+            draw_wrapped(temp, item["text"], self.font_sm, (*TEXT, alpha), pygame.Rect(6, 3, 900, 26), 2)
+            self.screen.blit(temp, (30, int(y + item["y"])))
             y += 30
         self.execute_rect = pygame.Rect(960, 610, 132, 42)
         self.next_rect = pygame.Rect(1110, 610, 112, 42)
-        can_execute = len(self.selected) == 2 and self.mode == "playing"
-        rounded_rect(self.screen, self.execute_rect, CYAN if can_execute else (51, 65, 85), 9)
-        draw_text(self.screen, "执行本回合", self.font_sm, BG if can_execute else MUTED, (982, 621))
-        rounded_rect(self.screen, self.next_rect, (35, 24, 76), 9, VIOLET, 1)
-        draw_text(self.screen, "下一关", self.font_sm, TEXT, (1139, 621))
+        can_execute = len(self.selected) == 2 and self.mode == "playing" and not self.input_locked
+        self.draw_button(self.execute_rect, "?????", can_execute, CYAN)
+        self.draw_button(self.next_rect, "???", not self.input_locked, VIOLET)
         if self.level.get("modifier"):
             draw_wrapped(self.screen, self.level["modifier"]["note"], self.font_xs, AMBER, pygame.Rect(960, 666, 260, 22), 1)
 
@@ -583,35 +741,35 @@ class Game:
         overlay.fill((2, 6, 23, 210))
         self.screen.blit(overlay, (0, 0))
         box = pygame.Rect(250, 130, 780, 460)
+        draw_soft_glow(self.screen, box, CYAN, strength=35, radius=16)
         rounded_rect(self.screen, box, (8, 13, 32), 16, CYAN, 2)
         score, passed, maxim = self.evaluate()
-        title = "稳态达成" if passed else "稳态失衡"
+        title = "????" if passed else "????"
         draw_text(self.screen, title, self.font_title, GREEN if passed else AMBER, (290, 165))
-        draw_text(self.screen, f"评分：{score}", self.font_lg, VIOLET, (780, 170))
+        draw_text(self.screen, f"???{score}", self.font_lg, VIOLET, (780, 170))
         y = 230
         for key, op, value in self.level["goals"]:
             ok = self.goal_met((key, op, value))
-            text = f"{'达成' if ok else '未达成'}：{key} {op} {value}，当前 {self.state[key]}"
+            text = f"{'??' if ok else '???'}?{key} {op} {value}??? {self.state[key]}"
             draw_text(self.screen, text, self.font_md, GREEN if ok else RED, (300, y))
             y += 35
-        draw_wrapped(self.screen, "生化之道：" + maxim, self.font_md, CYAN, pygame.Rect(300, 380, 680, 70), 6)
+        draw_wrapped(self.screen, "?????" + maxim, self.font_md, CYAN, pygame.Rect(300, 380, 680, 70), 6)
         self.retry_rect = pygame.Rect(565, 510, 130, 44)
         self.result_next_rect = pygame.Rect(720, 510, 150, 44)
-        rounded_rect(self.screen, self.retry_rect, (30, 41, 73), 9, (71, 85, 105), 1)
-        rounded_rect(self.screen, self.result_next_rect, CYAN, 9)
-        draw_text(self.screen, "重试本关", self.font_sm, TEXT, (594, 522))
-        draw_text(self.screen, "进入下一关", self.font_sm, BG, (750, 522))
+        self.draw_button(self.retry_rect, "????", True, VIOLET)
+        self.draw_button(self.result_next_rect, "?????", True, CYAN)
 
     def draw_final(self):
         overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
         overlay.fill((2, 6, 23, 230))
         self.screen.blit(overlay, (0, 0))
         box = pygame.Rect(210, 95, 860, 530)
+        draw_soft_glow(self.screen, box, VIOLET, strength=40, radius=18)
         rounded_rect(self.screen, box, (8, 13, 32), 18, VIOLET, 2)
-        draw_text(self.screen, "通关总结", self.font_title, CYAN, (260, 145))
-        summary = "代谢不是追求单一最大化，而是在能量、物质、还原力、毒性和环境需求之间维持动态平衡。"
+        draw_text(self.screen, "????", self.font_title, CYAN, (260, 145))
+        summary = "?????????????????????????????????????????"
         draw_wrapped(self.screen, summary, self.font_lg, TEXT, pygame.Rect(260, 215, 760, 100), 8)
-        items = ["抓住关键", "动态平衡", "响应需求", "藏器于势", "逆势而行", "分合自然"]
+        items = ["????", "????", "????", "????", "????", "????"]
         for i, item in enumerate(items):
             x = 285 + (i % 3) * 235
             y = 355 + (i // 3) * 72
@@ -619,8 +777,7 @@ class Game:
             rounded_rect(self.screen, r, (24, 38, 80), 10, CYAN if i % 2 == 0 else VIOLET, 1)
             draw_text(self.screen, item, self.font_md, TEXT, (x + 48, y + 11))
         self.final_restart_rect = pygame.Rect(550, 540, 180, 44)
-        rounded_rect(self.screen, self.final_restart_rect, CYAN, 9)
-        draw_text(self.screen, "重新开始", self.font_sm, BG, (607, 552))
+        self.draw_button(self.final_restart_rect, "????", True, CYAN)
 
     def draw(self):
         self.draw_background()
@@ -651,6 +808,8 @@ class Game:
                 self.level_index = 0
                 self.reset_level()
             return
+        if self.input_locked:
+            return
         if self.execute_rect.collidepoint(pos):
             self.execute_turn()
             return
@@ -677,6 +836,7 @@ class Game:
 
     def run(self):
         while True:
+            dt = self.clock.tick(FPS) / 1000.0
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -691,8 +851,8 @@ class Game:
                         sys.exit()
                     if event.key == pygame.K_RETURN:
                         self.execute_turn()
+            self.update(dt)
             self.draw()
-            self.clock.tick(FPS)
 
 
 if __name__ == "__main__":
