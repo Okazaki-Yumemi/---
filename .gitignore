@@ -1,6 +1,11 @@
 node_modules
 dist
 release
+build
+__pycache__
+*.pyc
+*.pyo
+*.spec
 .DS_Store
 *.local
 *.tsbuildinfo
