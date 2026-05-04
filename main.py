@@ -1063,8 +1063,8 @@ class Game:
         draw_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_md, MUTED, (438, 145))
         quote_index = int(self.time // 3) % len(TITLE_QUOTES)
         fade = 0.55 + 0.45 * abs(math.sin((self.time % 3) / 3 * math.pi))
-        quote_surface = self.font_lg.render(TITLE_QUOTES[quote_index], True, mix(MUTED, CYAN, fade))
-        self.screen.blit(quote_surface, (WIDTH // 2 - quote_surface.get_width() // 2, 410))
+        quote_surface = self.font_md.render(TITLE_QUOTES[quote_index], True, mix(MUTED, CYAN, fade))
+        self.screen.blit(quote_surface, (WIDTH // 2 - quote_surface.get_width() // 2, 386))
         buttons = [
             ("开始游戏", SCREEN_MAIN_MENU),
             ("教程模式", SCREEN_TUTORIAL),
@@ -1074,7 +1074,7 @@ class Game:
         ]
         self.title_buttons = []
         for i, (label, target) in enumerate(buttons):
-            rect = pygame.Rect(520, 438 + i * 50, 240, 40)
+            rect = pygame.Rect(520, 456 + i * 48, 240, 38)
             self.draw_menu_button(rect, label, CYAN if i == 0 else VIOLET)
             self.title_buttons.append((rect, target))
         draw_text(self.screen, AUTHOR_LINE, self.font_sm, MUTED, (32, 680))
