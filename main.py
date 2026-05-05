@@ -1137,7 +1137,7 @@ class Game:
 
     def draw_title(self):
         self.draw_background()
-        core = (WIDTH // 2, 245)
+        core = (WIDTH // 2, 260)
         for i in range(7):
             angle = self.time * (0.35 + i * 0.04) + i
             radius = 82 + i * 18
@@ -1151,9 +1151,8 @@ class Game:
         title_alpha = 0.75 + 0.25 * math.sin(self.time * 1.4)
         draw_centered_text(self.screen, "代谢之城 Cell City", self.font_title, mix(TEXT, CYAN, title_alpha * 0.25), WIDTH // 2, 95)
         draw_centered_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_md, MUTED, WIDTH // 2, 145)
-        draw_cloud_line(self.screen, 390, 174, 500, GOLD, 80)
-        draw_seal(self.screen, pygame.Rect(840, 92, 58, 58), "稳态", self.font_sm)
-        draw_text(self.screen, "古风科幻 · 代谢调度", self.font_sm, GOLD, (572, 178))
+        draw_cloud_line(self.screen, 430, 184, 420, GOLD, 55)
+        draw_seal(self.screen, pygame.Rect(875, 104, 52, 52), "稳态", self.font_xs)
         quote_index = int(self.time // 3) % len(TITLE_QUOTES)
         fade = 0.55 + 0.45 * abs(math.sin((self.time % 3) / 3 * math.pi))
         quote_surface = self.font_md.render(TITLE_QUOTES[quote_index], True, mix(MUTED, CYAN, fade))
