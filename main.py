@@ -516,6 +516,11 @@ def draw_text(surface, text, font, color, pos):
     surface.blit(font.render(text, True, color), pos)
 
 
+def draw_centered_text(surface, text, font, color, center_x, y):
+    rendered = font.render(text, True, color)
+    surface.blit(rendered, (center_x - rendered.get_width() // 2, y))
+
+
 def wrap_text(text, font, max_width):
     lines = []
     for paragraph in text.split("\n"):
@@ -985,6 +990,7 @@ class Game:
     def update(self, dt):
         self.time += dt
         mouse = pygame.mouse.get_pos()
+        self.clamp_card_scroll()
         for key in STATE_KEYS:
             self.display_state[key] = approach(self.display_state[key], self.state[key], self.STATUS_SMOOTH_SPEED, dt)
         for i, rect in enumerate(self.card_rects()):
@@ -1059,8 +1065,8 @@ class Game:
         pygame.draw.circle(self.screen, (19, 39, 78), core, 58)
         pygame.draw.circle(self.screen, CYAN, core, 58, 2)
         title_alpha = 0.75 + 0.25 * math.sin(self.time * 1.4)
-        draw_text(self.screen, "代谢之城 Cell City", self.font_title, mix(TEXT, CYAN, title_alpha * 0.25), (410, 95))
-        draw_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_md, MUTED, (438, 145))
+        draw_centered_text(self.screen, "代谢之城 Cell City", self.font_title, mix(TEXT, CYAN, title_alpha * 0.25), WIDTH // 2, 95)
+        draw_centered_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_md, MUTED, WIDTH // 2, 145)
         quote_index = int(self.time // 3) % len(TITLE_QUOTES)
         fade = 0.55 + 0.45 * abs(math.sin((self.time % 3) / 3 * math.pi))
         quote_surface = self.font_md.render(TITLE_QUOTES[quote_index], True, mix(MUTED, CYAN, fade))
@@ -1327,15 +1333,28 @@ class Game:
             rects.append(pygame.Rect(x0 + col * 188, y0 + row * 98, card_w, card_h))
         return rects
 
+    def card_view_rect(self):
+        return pygame.Rect(872, 150, 380, 335)
+
+    def max_card_scroll(self):
+        rows = math.ceil(len(self.current_deck()) / 2)
+        content_height = rows * 98
+        return max(0, content_height - self.card_view_rect().height + 16)
+
+    def clamp_card_scroll(self):
+        self.card_scroll = max(0, min(self.max_card_scroll(), self.card_scroll))
+
     def draw_cards(self):
         area = pygame.Rect(864, 112, 398, 430)
         self.draw_panel(area, VIOLET)
         draw_text(self.screen, f"行动卡牌  已选 {len(self.selected)}/2", self.font_md, VIOLET, (882, 128))
+        self.clamp_card_scroll()
         clip = self.screen.get_clip()
-        self.screen.set_clip(pygame.Rect(872, 150, 380, 335))
+        view = self.card_view_rect()
+        self.screen.set_clip(view)
         deck = self.current_deck()
         for i, rect in enumerate(self.card_rects()):
-            if rect.bottom < 150 or rect.top > 492:
+            if rect.bottom < view.top or rect.top > view.bottom:
                 continue
             card = deck[i]
             selected = i in self.selected
@@ -1359,6 +1378,13 @@ class Game:
             effect = self.modified_effect(card)
             draw_wrapped(self.screen, effect_to_text(effect), self.font_xs, CYAN, pygame.Rect(draw_rect.x + 10, draw_rect.y + 54, draw_rect.w - 18, 28), 0)
         self.screen.set_clip(clip)
+        max_scroll = self.max_card_scroll()
+        if max_scroll > 0:
+            track = pygame.Rect(1246, view.y, 4, view.height)
+            thumb_h = max(42, int(view.height * view.height / (view.height + max_scroll)))
+            thumb_y = view.y + int((view.height - thumb_h) * (self.card_scroll / max_scroll))
+            pygame.draw.rect(self.screen, (30, 41, 73), track, border_radius=3)
+            pygame.draw.rect(self.screen, VIOLET, pygame.Rect(track.x, thumb_y, track.w, thumb_h), border_radius=3)
         strategy = "挑战模式：在随机扰动中维持 ATP、血糖、ROS 与 NH3 安全。" if self.is_challenge else self.level["strategy"]
         draw_wrapped(self.screen, strategy, self.font_sm, MUTED, pygame.Rect(882, 492, 345, 38))
 
@@ -1749,8 +1775,7 @@ class Game:
     def handle_wheel(self, y):
         mx, my = pygame.mouse.get_pos()
         if 864 <= mx <= 1262 and 112 <= my <= 542:
-            max_scroll = 6 * 98 - 335 + 8
-            self.card_scroll = max(0, min(max_scroll, self.card_scroll - y * 35))
+            self.card_scroll = max(0, min(self.max_card_scroll(), self.card_scroll - y * 44))
 
     def run(self):
         while True:
