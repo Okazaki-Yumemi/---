@@ -607,6 +607,18 @@ def draw_soft_glow(surface, rect, color, strength=28, radius=12):
     surface.blit(glow, (rect.x - strength, rect.y - strength))
 
 
+def draw_corner_brackets(surface, rect, color, length=18, width=2):
+    points = [
+        ((rect.left, rect.top + length), (rect.left, rect.top), (rect.left + length, rect.top)),
+        ((rect.right - length, rect.top), (rect.right, rect.top), (rect.right, rect.top + length)),
+        ((rect.left, rect.bottom - length), (rect.left, rect.bottom), (rect.left + length, rect.bottom)),
+        ((rect.right - length, rect.bottom), (rect.right, rect.bottom), (rect.right, rect.bottom - length)),
+    ]
+    for a, b, c in points:
+        pygame.draw.line(surface, color, a, b, width)
+        pygame.draw.line(surface, color, b, c, width)
+
+
 def edge_progress_point(start, end, progress):
     return (start[0] + (end[0] - start[0]) * progress, start[1] + (end[1] - start[1]) * progress)
 
@@ -655,6 +667,17 @@ class Game:
         self.card_scroll = 0
         self.mode = "playing"
         self.time = 0.0
+        self.bg_particles = [
+            {
+                "x": random.uniform(0, WIDTH),
+                "y": random.uniform(0, HEIGHT),
+                "speed": random.uniform(8, 26),
+                "size": random.choice([1, 1, 2]),
+                "phase": random.uniform(0, math.tau),
+                "color": CYAN if i % 3 else VIOLET,
+            }
+            for i in range(70)
+        ]
         self.display_state = {}
         self.card_anim = [{"hover": 0.0, "select": 0.0, "flash": 0.0} for _ in (CARDS + CHALLENGE_CARDS)]
         self.log_items = []
@@ -991,6 +1014,12 @@ class Game:
         self.time += dt
         mouse = pygame.mouse.get_pos()
         self.clamp_card_scroll()
+        for particle in self.bg_particles:
+            particle["y"] -= particle["speed"] * dt
+            particle["x"] += math.sin(self.time * 0.55 + particle["phase"]) * 8 * dt
+            if particle["y"] < -8:
+                particle["y"] = HEIGHT + 8
+                particle["x"] = random.uniform(0, WIDTH)
         for key in STATE_KEYS:
             self.display_state[key] = approach(self.display_state[key], self.state[key], self.STATUS_SMOOTH_SPEED, dt)
         for i, rect in enumerate(self.card_rects()):
@@ -1028,6 +1057,11 @@ class Game:
         pulse = 0.45 + 0.25 * math.sin(self.time * 1.6)
         draw_soft_glow(self.screen, rect, accent, strength=18, radius=12)
         rounded_rect(self.screen, rect, PANEL, 12, mix((45, 78, 120), accent, pulse * 0.22), 1)
+        draw_corner_brackets(self.screen, rect.inflate(-10, -10), mix((45, 78, 120), accent, 0.55), 16, 1)
+        sheen_x = rect.x + int((self.time * 28) % max(1, rect.width + 80)) - 80
+        sheen = pygame.Surface((44, rect.height - 18), pygame.SRCALPHA)
+        pygame.draw.polygon(sheen, (*accent, 18), [(18, 0), (44, 0), (26, rect.height - 18), (0, rect.height - 18)])
+        self.screen.blit(sheen, (sheen_x, rect.y + 9))
 
     def draw_background(self):
         self.screen.fill(BG)
@@ -1046,6 +1080,16 @@ class Game:
                 a = int(alpha * (r / radius) ** 2)
                 pygame.draw.circle(glow, (*color, a), (radius, radius), r)
             self.screen.blit(glow, (center[0] - radius, center[1] - radius))
+        for particle in self.bg_particles:
+            flicker = 0.45 + 0.55 * abs(math.sin(self.time * 1.7 + particle["phase"]))
+            color = mix(BG, particle["color"], flicker)
+            pygame.draw.circle(self.screen, color, (int(particle["x"]), int(particle["y"])), particle["size"])
+        scan_y = int((self.time * 36) % HEIGHT)
+        scan = pygame.Surface((WIDTH, 34), pygame.SRCALPHA)
+        for i in range(34):
+            alpha = max(0, 22 - abs(i - 17) * 2)
+            pygame.draw.line(scan, (*CYAN, alpha), (0, i), (WIDTH, i))
+        self.screen.blit(scan, (0, scan_y - 17))
 
     def draw_menu_button(self, rect, text, accent=CYAN, enabled=True):
         self.draw_button(rect, text, enabled, accent)
@@ -1301,6 +1345,11 @@ class Game:
         rect = pygame.Rect(288, 112, 560, 430)
         self.draw_panel(rect, CYAN)
         draw_text(self.screen, "代谢地图", self.font_md, CYAN, (306, 128))
+        for i in range(22):
+            x = rect.x + 35 + (i * 73) % (rect.width - 70)
+            y = rect.y + 62 + (i * 47) % (rect.height - 110)
+            alpha_wave = 0.35 + 0.65 * abs(math.sin(self.time * 0.9 + i))
+            pygame.draw.circle(self.screen, mix((20, 30, 55), CYAN, alpha_wave * 0.35), (x, y), 1)
         path_phase = 1.0 - self.path_timer / self.path_duration if self.path_duration else 1.0
         for start, end in MAP_EDGES:
             active = (start, end) in self.active_edges or (end, start) in self.active_edges
@@ -1371,6 +1420,14 @@ class Game:
             border_target = (251, 113, 133) if special else CYAN if selected else VIOLET
             border = mix((71, 85, 105), border_target, max(anim["hover"], anim["select"], anim["flash"]))
             rounded_rect(self.screen, draw_rect, color, 10, border, 2 if selected or anim["flash"] > 0.1 else 1)
+            if selected or special:
+                shimmer = (math.sin(self.time * 4.2 + i) + 1) / 2
+                pygame.draw.rect(
+                    self.screen,
+                    mix(border_target, WHITE, 0.35),
+                    pygame.Rect(draw_rect.x + 10, draw_rect.bottom - 8, int((draw_rect.width - 20) * shimmer), 2),
+                    border_radius=2,
+                )
             draw_text(self.screen, card["name"], self.font_sm, TEXT, (draw_rect.x + 10, draw_rect.y + 8))
             draw_text(self.screen, card["pathway"], self.font_xs, VIOLET, (draw_rect.x + 10, draw_rect.y + 31))
             if special and anim["hover"] > 0.2:
@@ -1400,6 +1457,12 @@ class Game:
             draw_soft_glow(self.screen, draw_rect, accent, strength=18, radius=9)
             base = mix(base, WHITE, 0.18)
         rounded_rect(self.screen, draw_rect, base, 9, mix(base, WHITE, 0.25), 1)
+        if enabled:
+            top_line = pygame.Rect(draw_rect.x + 10, draw_rect.y + 5, max(0, draw_rect.width - 20), 2)
+            pygame.draw.rect(self.screen, mix(base, WHITE, 0.42), top_line, border_radius=2)
+        if hover:
+            ring = draw_rect.inflate(8, 8)
+            pygame.draw.rect(self.screen, (*accent, 120), ring, width=1, border_radius=11)
         label_color = BG if enabled and accent == CYAN else TEXT if enabled else MUTED
         text_surface = self.font_sm.render(text, True, label_color)
         self.screen.blit(text_surface, (draw_rect.centerx - text_surface.get_width() // 2, draw_rect.centery - text_surface.get_height() // 2))
