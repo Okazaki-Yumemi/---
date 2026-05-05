@@ -22,6 +22,10 @@ GREEN = (74, 222, 128)
 AMBER = (251, 191, 36)
 RED = (248, 113, 113)
 WHITE = (255, 255, 255)
+GOLD = (218, 166, 83)
+JADE = (80, 220, 190)
+INK = (8, 12, 26)
+SEAL_RED = (168, 48, 58)
 
 STATE_KEYS = [
     "ATP",
@@ -619,6 +623,25 @@ def draw_corner_brackets(surface, rect, color, length=18, width=2):
         pygame.draw.line(surface, color, b, c, width)
 
 
+def draw_cloud_line(surface, x, y, width, color, alpha=95):
+    layer = pygame.Surface((width, 34), pygame.SRCALPHA)
+    c = (*color, alpha)
+    cursor = 0
+    while cursor < width:
+        pygame.draw.arc(layer, c, pygame.Rect(cursor, 4, 28, 22), math.pi, math.tau, 1)
+        pygame.draw.arc(layer, c, pygame.Rect(cursor + 17, 4, 28, 22), 0, math.pi, 1)
+        cursor += 46
+    surface.blit(layer, (x, y))
+
+
+def draw_seal(surface, rect, text, font):
+    rounded_rect(surface, rect, SEAL_RED, 4, (244, 180, 126), 2)
+    inner = rect.inflate(-8, -8)
+    pygame.draw.rect(surface, (244, 180, 126), inner, width=1, border_radius=3)
+    rendered = font.render(text, True, (255, 226, 185))
+    surface.blit(rendered, (rect.centerx - rendered.get_width() // 2, rect.centery - rendered.get_height() // 2))
+
+
 def edge_progress_point(start, end, progress):
     return (start[0] + (end[0] - start[0]) * progress, start[1] + (end[1] - start[1]) * progress)
 
@@ -677,6 +700,10 @@ class Game:
                 "color": CYAN if i % 3 else VIOLET,
             }
             for i in range(70)
+        ]
+        self.ink_waves = [
+            {"x": random.uniform(0, WIDTH), "y": random.uniform(40, HEIGHT - 40), "w": random.uniform(120, 260), "speed": random.uniform(3, 9)}
+            for _ in range(10)
         ]
         self.display_state = {}
         self.card_anim = [{"hover": 0.0, "select": 0.0, "flash": 0.0} for _ in (CARDS + CHALLENGE_CARDS)]
@@ -1020,6 +1047,11 @@ class Game:
             if particle["y"] < -8:
                 particle["y"] = HEIGHT + 8
                 particle["x"] = random.uniform(0, WIDTH)
+        for wave in self.ink_waves:
+            wave["x"] += wave["speed"] * dt
+            if wave["x"] > WIDTH + 60:
+                wave["x"] = -wave["w"]
+                wave["y"] = random.uniform(40, HEIGHT - 40)
         for key in STATE_KEYS:
             self.display_state[key] = approach(self.display_state[key], self.state[key], self.STATUS_SMOOTH_SPEED, dt)
         for i, rect in enumerate(self.card_rects()):
@@ -1057,7 +1089,9 @@ class Game:
         pulse = 0.45 + 0.25 * math.sin(self.time * 1.6)
         draw_soft_glow(self.screen, rect, accent, strength=18, radius=12)
         rounded_rect(self.screen, rect, PANEL, 12, mix((45, 78, 120), accent, pulse * 0.22), 1)
-        draw_corner_brackets(self.screen, rect.inflate(-10, -10), mix((45, 78, 120), accent, 0.55), 16, 1)
+        bracket_color = mix(GOLD, accent, 0.45)
+        draw_corner_brackets(self.screen, rect.inflate(-10, -10), bracket_color, 18, 1)
+        draw_cloud_line(self.screen, rect.x + 18, rect.y + 8, max(40, rect.width - 36), GOLD, 30)
         sheen_x = rect.x + int((self.time * 28) % max(1, rect.width + 80)) - 80
         sheen = pygame.Surface((44, rect.height - 18), pygame.SRCALPHA)
         pygame.draw.polygon(sheen, (*accent, 18), [(18, 0), (44, 0), (26, rect.height - 18), (0, rect.height - 18)])
@@ -1084,6 +1118,12 @@ class Game:
             flicker = 0.45 + 0.55 * abs(math.sin(self.time * 1.7 + particle["phase"]))
             color = mix(BG, particle["color"], flicker)
             pygame.draw.circle(self.screen, color, (int(particle["x"]), int(particle["y"])), particle["size"])
+        for wave in self.ink_waves:
+            layer = pygame.Surface((int(wave["w"]), 48), pygame.SRCALPHA)
+            for i in range(5):
+                pygame.draw.arc(layer, (*GOLD, 18 - i * 2), pygame.Rect(i * 20, 8 + i * 2, int(wave["w"] * 0.55), 24), 0, math.pi, 1)
+                pygame.draw.arc(layer, (*CYAN, 12), pygame.Rect(40 + i * 28, 12, int(wave["w"] * 0.45), 22), math.pi, math.tau, 1)
+            self.screen.blit(layer, (int(wave["x"]), int(wave["y"])))
         scan_y = int((self.time * 36) % HEIGHT)
         scan = pygame.Surface((WIDTH, 34), pygame.SRCALPHA)
         for i in range(34):
@@ -1111,6 +1151,9 @@ class Game:
         title_alpha = 0.75 + 0.25 * math.sin(self.time * 1.4)
         draw_centered_text(self.screen, "代谢之城 Cell City", self.font_title, mix(TEXT, CYAN, title_alpha * 0.25), WIDTH // 2, 95)
         draw_centered_text(self.screen, "A Strategy Game of Metabolic Homeostasis", self.font_md, MUTED, WIDTH // 2, 145)
+        draw_cloud_line(self.screen, 390, 174, 500, GOLD, 80)
+        draw_seal(self.screen, pygame.Rect(840, 92, 58, 58), "稳态", self.font_sm)
+        draw_text(self.screen, "古风科幻 · 代谢调度", self.font_sm, GOLD, (572, 178))
         quote_index = int(self.time // 3) % len(TITLE_QUOTES)
         fade = 0.55 + 0.45 * abs(math.sin((self.time % 3) / 3 * math.pi))
         quote_surface = self.font_md.render(TITLE_QUOTES[quote_index], True, mix(MUTED, CYAN, fade))
@@ -1345,6 +1388,7 @@ class Game:
         rect = pygame.Rect(288, 112, 560, 430)
         self.draw_panel(rect, CYAN)
         draw_text(self.screen, "代谢地图", self.font_md, CYAN, (306, 128))
+        draw_text(self.screen, "气机流转", self.font_xs, GOLD, (756, 130))
         for i in range(22):
             x = rect.x + 35 + (i * 73) % (rect.width - 70)
             y = rect.y + 62 + (i * 47) % (rect.height - 110)
@@ -1397,6 +1441,7 @@ class Game:
         area = pygame.Rect(864, 112, 398, 430)
         self.draw_panel(area, VIOLET)
         draw_text(self.screen, f"行动卡牌  已选 {len(self.selected)}/2", self.font_md, VIOLET, (882, 128))
+        draw_text(self.screen, "调度令", self.font_xs, GOLD, (1194, 130))
         self.clamp_card_scroll()
         clip = self.screen.get_clip()
         view = self.card_view_rect()
@@ -1455,11 +1500,12 @@ class Game:
         base = accent if enabled else (51, 65, 85)
         if hover:
             draw_soft_glow(self.screen, draw_rect, accent, strength=18, radius=9)
-            base = mix(base, WHITE, 0.18)
+            base = mix(base, GOLD if accent == VIOLET else WHITE, 0.18)
         rounded_rect(self.screen, draw_rect, base, 9, mix(base, WHITE, 0.25), 1)
         if enabled:
             top_line = pygame.Rect(draw_rect.x + 10, draw_rect.y + 5, max(0, draw_rect.width - 20), 2)
-            pygame.draw.rect(self.screen, mix(base, WHITE, 0.42), top_line, border_radius=2)
+            pygame.draw.rect(self.screen, mix(base, GOLD, 0.38), top_line, border_radius=2)
+            draw_corner_brackets(self.screen, draw_rect.inflate(-8, -8), mix(GOLD, accent, 0.5), 8, 1)
         if hover:
             ring = draw_rect.inflate(8, 8)
             pygame.draw.rect(self.screen, (*accent, 120), ring, width=1, border_radius=11)
